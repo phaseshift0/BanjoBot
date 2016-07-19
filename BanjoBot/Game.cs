@@ -15,7 +15,8 @@ namespace BanjoBot
     class Game
     {
         // Constants
-        const int MAXPLAYERS = 8;
+        const int MAXPLAYERS    = 8;
+        const int VOTETHRESHOLD = 5;
                 
         // Props
         public String gameName          { get; set; }
@@ -24,6 +25,7 @@ namespace BanjoBot
         public List<User> redList       { get; set; }
         public List<User> blueList      { get; set; }
         public Teams winner             { get; set; }
+        public List<User> cancelCalls   { get; set; }
         public List<User> redWinCalls   { get; set; }  
         public List<User> blueWinCalls  { get; set; }
         public List<User> drawCalls     { get; set; }
@@ -40,6 +42,7 @@ namespace BanjoBot
             waitingList   = new List<User>();
             redList       = new List<User>();
             blueList      = new List<User>();
+            cancelCalls   = new List<User>();
             blueWinCalls  = new List<User>();
             redWinCalls   = new List<User>();
             drawCalls     = new List<User>();
@@ -101,7 +104,7 @@ namespace BanjoBot
 
         /// <summary>
         /// Assigns players in waiting list to teams of roughly equal MMR.
-        /// By Michael Stimson.
+        /// By Kael
         /// </summary>
         public void assignTeams()
         {
@@ -147,7 +150,7 @@ namespace BanjoBot
         }
 
         /// <summary>
-        /// By Michael Stimson.
+        /// By Kael
         /// </summary>
         /// <param name="numPlayers">Number of players in the game.</param>
         /// <returns></returns>
@@ -228,6 +231,26 @@ namespace BanjoBot
         }
         
         /// <summary>
+        /// Records votes to cancel game. Once the number of votes reaches the VOTETHREASHOLD, the game is canceled.
+        /// </summary>
+        /// <param name="user">User who voted.</param>
+        /// <returns>String indicating status</returns>
+        public String voteCancel(User user)
+        {
+            if (!waitingList.Contains(user))
+                return "not in game";
+            if (cancelCalls.Contains(user))
+                return "already voted";
+
+            cancelCalls.Add(user);
+
+            if (cancelCalls.Count == Math.Floor((double)waitingList.Count()/2))
+                return "canceled";
+
+            return "more votes";
+        }
+
+        /// <summary>
         /// Records a vote for the winning team.
         /// </summary>
         /// <param name="user">User who voted.</param>
@@ -238,13 +261,13 @@ namespace BanjoBot
             if (!redList.Contains(user) && !blueList.Contains(user))
                 return "not in game";
 
-            if (blueWinCalls.Contains(user) || redWinCalls.Contains(user))
+            if (blueWinCalls.Contains(user) || redWinCalls.Contains(user) || drawCalls.Contains(user))
                 return "already voted";
 
             if (team == Teams.Blue)
             {
                 blueWinCalls.Add(user);
-                if (blueWinCalls.Count == 5)
+                if (blueWinCalls.Count == VOTETHRESHOLD)
                 {
                     winner = Teams.Blue;
                     adjustStats(winner);
@@ -255,7 +278,7 @@ namespace BanjoBot
             else if (team == Teams.Red)
             {
                 redWinCalls.Add(user);
-                if (redWinCalls.Count == 5)
+                if (redWinCalls.Count == VOTETHRESHOLD)
                 {
                     winner = Teams.Red;
                     adjustStats(winner);
@@ -266,7 +289,7 @@ namespace BanjoBot
             else if (team ==Teams.Draw)
             {
                 drawCalls.Add(user);
-                if (drawCalls.Count == 5)
+                if (drawCalls.Count == VOTETHRESHOLD)
                 {
                     winner = Teams.Draw;
                     endGame();

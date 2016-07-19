@@ -35,16 +35,36 @@ namespace BanjoBot
         /// <param name="id">User's id</param>
         /// <param name="name">User's name</param>
         /// <returns>The User.</returns>
-        public User getUser(ulong id, String name)
+        public User getUser(ulong id, String name, String mention)
+        {
+            // If user exists in DataStore
+            if (users.ContainsKey(id))
+            {
+                // Used to upgrade data in BanjoStore from v1.2
+                if (users[id].mention == "")
+                    users[id].mention = mention;
+                return users[id];
+            }
+
+
+            User user = new User(id, name, mention);
+            users.Add(user.id, user);
+
+            return user;
+        }
+
+        /// <summary>
+        /// Gets the user from the DataStore. Returns null if user does not exist.
+        /// </summary>
+        /// <param name="id">User's ID.</param>
+        /// <returns>The User if it exists, null otherwise.</returns>
+        public User getUser(ulong id)
         {
             // If user exists in DataStore
             if (users.ContainsKey(id))
                 return users[id];
 
-            User user = new User(id, name);
-            users.Add(user.id, user);
-
-            return user;
+            return null;
         }
 
         /// <summary>
@@ -91,6 +111,7 @@ namespace BanjoBot
                     writer.WriteStartElement("User");
                     writer.WriteElementString("ID", obj.Value.id.ToString());
                     writer.WriteElementString("Name", obj.Value.name);
+                    writer.WriteElementString("Mention", obj.Value.mention);
                     writer.WriteElementString("MMR", obj.Value.mmr.ToString());
                     writer.WriteElementString("Wins", obj.Value.wins.ToString());
                     writer.WriteElementString("Losses", obj.Value.losses.ToString());
@@ -123,7 +144,20 @@ namespace BanjoBot
             foreach (XmlNode node in nodes)
             {
                 User user;
-                if (node.ChildNodes.Count == 6)
+                if (node.ChildNodes.Count == 7)
+                {
+                    user = new User(
+                        Convert.ToUInt64(node.ChildNodes[0].InnerText),
+                        node.ChildNodes[1].InnerText,
+                        node.ChildNodes[2].InnerText,
+                        Convert.ToInt32(node.ChildNodes[3].InnerText),
+                        Convert.ToInt32(node.ChildNodes[4].InnerText),
+                        Convert.ToInt32(node.ChildNodes[5].InnerText),
+                        Convert.ToInt32(node.ChildNodes[6].InnerText)
+                        );
+                }
+                // for upgrading existing XML file to be compatible with BanjoBot v1.2
+                else
                 {
                     user = new User(
                         Convert.ToUInt64(node.ChildNodes[0].InnerText),
@@ -132,17 +166,6 @@ namespace BanjoBot
                         Convert.ToInt32(node.ChildNodes[3].InnerText),
                         Convert.ToInt32(node.ChildNodes[4].InnerText),
                         Convert.ToInt32(node.ChildNodes[5].InnerText)
-                        );
-                }
-                // for upgrading existing XML file to be compatible with BanjoBot v1.1
-                else
-                {
-                    user = new User(
-                        Convert.ToUInt64(node.ChildNodes[0].InnerText),
-                        node.ChildNodes[1].InnerText,
-                        Convert.ToInt32(node.ChildNodes[2].InnerText),
-                        Convert.ToInt32(node.ChildNodes[3].InnerText),
-                        Convert.ToInt32(node.ChildNodes[4].InnerText)
                         );
                 }
 

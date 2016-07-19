@@ -61,16 +61,28 @@ namespace BanjoBot {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to BanjoBot v1.1 Command List:
-        ///!hostgame - Creates a new game (only one game may be in the lobby at a time).
-        ///!join - Joins the currently open game.
-        ///!leave - Leaves the currently open game.
-        ///!cancel – Cancels the currently open game. (New command)
-        ///!startgame – Start the game (host only, requires 8 players).
-        ///!list – Shows the players that have joined the currently open game. (New command)
-        ///!stats - Shows your current league stats.
-        ///!getgames - Shows any currently open games.
-        ///!bluewins BBL#X - Cast vote for [rest of string was truncated]&quot;;.
+        ///   Looks up a localized string similar to BanjoBot v{0} Command List:
+        ///
+        ///!hostgame, !host, !hg
+        ///        Creates a new game. Only one game may be in the lobby at a time.
+        ///
+        ///!join, !j
+        ///        Joins the open game.
+        ///
+        ///!leave, !l
+        ///        Leaves the open game.
+        ///
+        ///!cancelgame, !cancel, !c
+        ///        Cancels the open game.
+        ///
+        ///!votecancel, !vc
+        ///        Casts a vote to cancel the open game.
+        ///
+        ///!startgame, !start, !sg
+        ///        Start the game. Host only, requires full game.
+        ///
+        ///!getplayers, !players, !list, !gp
+        ///        Shows the players that have joined the cu [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string helpString {
             get {
