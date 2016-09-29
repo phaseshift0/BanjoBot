@@ -56,7 +56,11 @@ namespace BanjoBot
 
             // If successful
             if (addPlayerResult == true)
+            {
                 await textChannel.SendMessage(user.ToString() + " has joined " + activeGame.gameName + ". (" + activeGame.waitingList.Count() + "/8)");
+                if (activeGame.waitingList.Count() == 8)
+                    await textChannel.SendMessage(activeGame.host.mention + ", The lobby is full. Type !startgame to start the game");
+            }
             // If unsuccessfull
             else if (addPlayerResult == false)
                 await writeMessage(textChannel, user.mention + " The game " + activeGame.gameName + " is full.");
@@ -128,20 +132,20 @@ namespace BanjoBot
             // If the game sucessfully started
             else
             {
-                await writeMessage(textChannel, activeGame.gameName + " has been started by " + user.ToString() + ".");
+                await textChannel.SendMessage(activeGame.gameName + " has been started by " + user.ToString() + ".");
 
                 // Prepare Blue Team
                 String blueTeam = "Blue Team (" + activeGame.getTeamMMR(Teams.Blue) + "): ";
                 foreach (var player in activeGame.blueList)
                 {
-                    blueTeam += player.ToString() + " ";
+                    blueTeam += player.mention + "(" + player.mmr + ") ";
                 }
 
                 // Prepare Red Team
                 String redTeam = "Red Team (" + activeGame.getTeamMMR(Teams.Red) + "): ";
                 foreach (var player in activeGame.redList)
                 {
-                    redTeam += player.ToString() + " ";
+                    redTeam += player.mention + "(" + player.mmr + ") ";
                 }
 
                 // Broadcast teams and password
@@ -166,13 +170,13 @@ namespace BanjoBot
             // If no games are open.
             if (activeGame == null)
             {
-                await writeMessage(textChannel, "No games open. Type !hostgame to create a game.");
+                await textChannel.SendMessage("No games open. Type !hostgame to create a game.");
                 return;
             }
 
             if (user == activeGame.host)
             {
-                await writeMessage(textChannel, "Game " + activeGame.gameName + " canceled by host " + user.name + ".");
+                await textChannel.SendMessage("Game " + activeGame.gameName + " canceled by host " + user.name + ".");
                 activeGame = null;
             }
         }
