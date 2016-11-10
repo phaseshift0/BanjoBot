@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -222,7 +222,6 @@ namespace BanjoBot
             commands.CreateCommand("bluewins")
                     .Alias(new string[] { "blue", "bw" })
                     .Description("Cast vote for Blue Team as the winner of game BBL#X (post game only).")
-                    .Parameter("gameName", ParameterType.Required)
                     .Do(async e =>
                     {
                         // Get or create user
@@ -232,14 +231,13 @@ namespace BanjoBot
                         else
                             user = ds.getUser(e.User.Id, e.User.Name, e.User.Mention);
 
-                        await cmd.voteWinner(e.Channel, user, Teams.Blue, e.GetArg("gameName"));
+                        await cmd.voteWinner(e.Channel, user, Teams.Blue);
                     });
 
             // Create !redwins command
             commands.CreateCommand("redwins")
                     .Alias(new string[] { "red", "rw" })
                     .Description("Cast vote for Red Team as the winner of game BBL#X (post game only).")
-                    .Parameter("gameName", ParameterType.Required)
                     .Do(async e =>
                     {
                         // Get or create user
@@ -249,14 +247,13 @@ namespace BanjoBot
                         else
                             user = ds.getUser(e.User.Id, e.User.Name, e.User.Mention);
 
-                        await cmd.voteWinner(e.Channel, user, Teams.Red, e.GetArg("gameName"));
+                        await cmd.voteWinner(e.Channel, user, Teams.Red);
                     });
 
             // Create !draw command
             commands.CreateCommand("draw")
                     .Alias(new string[] { "d" })
                     .Description("Cast vote for a tied game for BBL#X (post game only).")
-                    .Parameter("gameName", ParameterType.Required)
                     .Do(async e =>
                     {
                         // Get or create user
@@ -266,7 +263,7 @@ namespace BanjoBot
                         else
                             user = ds.getUser(e.User.Id, e.User.Name, e.User.Mention);
 
-                        await cmd.voteWinner(e.Channel, user, Teams.Draw, e.GetArg("gameName"));
+                        await cmd.voteWinner(e.Channel, user, Teams.Draw);
                     });
 
             // Create !topmmr command
