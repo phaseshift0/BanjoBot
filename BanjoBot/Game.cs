@@ -1,4 +1,4 @@
-﻿using Discord;
+using Discord;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -261,11 +261,14 @@ namespace BanjoBot
             if (!redList.Contains(user) && !blueList.Contains(user))
                 return "not in game";
 
-            if (blueWinCalls.Contains(user) || redWinCalls.Contains(user) || drawCalls.Contains(user))
-                return "already voted";
-
             if (team == Teams.Blue)
             {
+                if (blueWinCalls.Contains(user))
+                    return "already voted";
+                if (redWinCalls.Contains(user))
+                    redWinCalls.Remove(user);
+                if (drawCalls.Contains(user))
+                    drawCalls.Remove(user);
                 blueWinCalls.Add(user);
                 if (blueWinCalls.Count == VOTETHRESHOLD)
                 {
@@ -277,6 +280,12 @@ namespace BanjoBot
             }
             else if (team == Teams.Red)
             {
+                if (redWinCalls.Contains(user))
+                    return "already voted";
+                if (blueWinCalls.Contains(user))
+                    blueWinCalls.Remove(user);
+                if (drawCalls.Contains(user))
+                    drawCalls.Remove(user);
                 redWinCalls.Add(user);
                 if (redWinCalls.Count == VOTETHRESHOLD)
                 {
@@ -288,6 +297,12 @@ namespace BanjoBot
             }
             else if (team ==Teams.Draw)
             {
+                if (drawCalls.Contains(user))
+                    return "already voted";
+                if (blueWinCalls.Contains(user))
+                    blueWinCalls.Remove(user);
+                if (redWinCalls.Contains(user))
+                    redWinCalls.Remove(user);
                 drawCalls.Add(user);
                 if (drawCalls.Count == VOTETHRESHOLD)
                 {
