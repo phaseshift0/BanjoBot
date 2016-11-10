@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -27,6 +27,12 @@ namespace BanjoBot
         /// <param name="host">The User who hosted the game.</param>
         public async Task hostGame(Channel textChannel, User host)
         {
+            bool? inGame = gameCheck(host);
+            if (inGame == false)
+            {
+                await writeMessage(textChannel, host.mention + " Vote before hosting another game");
+                return;
+            }
             // If no games are open.
             if (activeGame == null)
             {
@@ -44,6 +50,12 @@ namespace BanjoBot
         /// <param name="user">User who wishes to join.</param>
         public async Task joinGame(Channel textChannel, User user)
         {
+            bool? inGame = gameCheck(user);
+            if (inGame == false)
+            {
+                await writeMessage(textChannel, user.mention + " Vote before joining another game");
+                return;
+            }
             // If no games are open.
             if (activeGame == null)
             {
@@ -69,6 +81,17 @@ namespace BanjoBot
                 await writeMessage(textChannel, user.mention + " you can not join a game you are already in.");
             else
                 await writeMessage(textChannel, "Error: Command.joinGame()");
+        }
+
+        private bool gameCheck(User user)
+        {
+            string gameName = user.currentGame;
+            int index = gameExists(gameName);
+            if (index == -1)
+                return true;
+            if (runningGames[index].blueWinCalls.Contains(user) || runningGames[index].redWinCalls.Contains(user) || runningGames[index].drawCalls.Contains(user))
+                return true;
+            return false;
         }
 
         /// <summary>
@@ -139,6 +162,7 @@ namespace BanjoBot
                 foreach (var player in activeGame.blueList)
                 {
                     blueTeam += player.mention + "(" + player.mmr + ") ";
+                    player.currentGame = activeGame.gameName;
                 }
 
                 // Prepare Red Team
@@ -146,6 +170,7 @@ namespace BanjoBot
                 foreach (var player in activeGame.redList)
                 {
                     redTeam += player.mention + "(" + player.mmr + ") ";
+                    player.currentGame = activeGame.gameName;
                 }
 
                 // Broadcast teams and password
@@ -243,14 +268,15 @@ namespace BanjoBot
         /// <param name="e">MessageEventArgs, used to extract gameName and Channel</param>
         /// <param name="user">User who voted.</param>
         /// <param name="team">Team that the user voted for.</param>
-        public async Task voteWinner(Channel textChannel, User user, Teams team, String gameName)
+        public async Task voteWinner(Channel textChannel, User user, Teams team)
         {
+            string gameName = user.currentGame;
             int index = gameExists(gameName);
 
             // If the game doesn't exist.
             if (index == -1)
             {
-                await writeMessage(textChannel, user.mention + " game " + gameName + " does not exist.");
+                await writeMessage(textChannel, user.mention + " you are not in a game.");
                 return;
             }
             String result = runningGames[index].recordVote(user, team);
@@ -261,7 +287,7 @@ namespace BanjoBot
                     break;
 
                 case "already voted":
-                    await writeMessage(textChannel, user.mention + " you have already voted.");
+                    await writeMessage(textChannel, user.mention + " you have already voted for this team.");
                     break;
 
                 case "more votes":
@@ -284,6 +310,7 @@ namespace BanjoBot
                             messageBlue += player.ToString() + "+" + 2 * (player.streak-1) + " ";
                         else
                             messageBlue += player.ToString() + " ";
+                        player.currentGame = "0";
                     }
                     await textChannel.SendMessage(messageBlue);
 
@@ -292,6 +319,7 @@ namespace BanjoBot
                     foreach (var player in runningGames[index].redList)
                     {
                         messageBlue += player.ToString() + " ";
+                        player.currentGame = "0";
                     }
                     await textChannel.SendMessage(messageBlue);
 
@@ -307,6 +335,7 @@ namespace BanjoBot
                     foreach (var player in runningGames[index].blueList)
                     {
                         messageRed += player.ToString() + " ";
+                        player.currentGame = "0";
                     }
                     await textChannel.SendMessage(messageRed);
 
@@ -318,6 +347,7 @@ namespace BanjoBot
                             messageRed += player.ToString() + "+" + 2*(player.streak-1) + " ";
                         else
                             messageRed += player.ToString() + " ";
+                        player.currentGame = "0";
                     }
                     await textChannel.SendMessage(messageRed);
 
@@ -327,7 +357,14 @@ namespace BanjoBot
                 case "draw":
                     // No stats recorded
                     await textChannel.SendMessage("Game " + gameName + " has ended in a draw. No stats have been recorded.");
-
+                    foreach (var player in runningGames[index].blueList)
+                    {
+                        player.currentGame = "0";
+                    }
+                    foreach (var player in runningGames[index].redList)
+                    {
+                        player.currentGame = "0";
+                    }
                     // End the game
                     endGame(textChannel, gameName);
                     break;
