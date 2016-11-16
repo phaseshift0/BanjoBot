@@ -244,7 +244,7 @@ namespace BanjoBot
 
             cancelCalls.Add(user);
 
-            if (cancelCalls.Count == Math.Floor((double)waitingList.Count()/2))
+            if (cancelCalls.Count >= Math.Floor((double)waitingList.Count()/2))
                 return "canceled";
 
             return "more votes";
