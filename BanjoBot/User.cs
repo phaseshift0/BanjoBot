@@ -17,6 +17,7 @@ namespace BanjoBot
         public int wins             { get; set; }
         public int losses           { get; set; }
         public int streak           { get; set; }
+        public string currentGame   { get; set; }
 
         /// <summary>
         /// Create a new User and add it to the DataStore.
