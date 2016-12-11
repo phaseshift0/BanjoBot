@@ -5,18 +5,19 @@ using System.Text;
 using System.Threading.Tasks;
 using Discord;
 using System.Reflection;
+using System.Resources;
 
 namespace BanjoBot
 {
     class Commands
     {
         // Props
-        private Game activeGame;
+        private List<Game> activeGames;
         private List<Game> runningGames;
 
         public Commands()
         {
-            activeGame   = null;
+            activeGames = new List<Game>();
             runningGames = new List<Game>();
         }
 
@@ -34,13 +35,21 @@ namespace BanjoBot
                 return;
             }
             // If no games are open.
-            if (activeGame == null)
+            if (!openGamesExists(textChannel))
             {
                 activeGame = new Game(host);
                 await textChannel.SendMessage("New game " + activeGame.gameName + " hosted by " + host.ToString() + ". \nType !join to join the game. (" + activeGame.waitingList.Count() + "/8)");
             }
             else
                 await writeMessage(textChannel, host.mention + " Game " + activeGame.gameName + " is already open. Only one game may be hosted at a time. \nType !join to join the game.");
+        }
+
+        public bool openGamesExists(Channel channel) {
+            foreach (Game game in activeGames) {
+                if(game.channel == channel) {
+                    return true;
+                }
+            }
         }
 
         /// <summary>
@@ -70,8 +79,9 @@ namespace BanjoBot
             if (addPlayerResult == true)
             {
                 await textChannel.SendMessage(user.ToString() + " has joined " + activeGame.gameName + ". (" + activeGame.waitingList.Count() + "/8)");
-                if (activeGame.waitingList.Count() == 8)
+                if (activeGame.waitingList.Count() == 8) { 
                     await textChannel.SendMessage(activeGame.host.mention + ", The lobby is full. Type !startgame to start the game");
+                }
             }
             // If unsuccessfull
             else if (addPlayerResult == false)
@@ -201,9 +211,12 @@ namespace BanjoBot
 
             if (user == activeGame.host)
             {
-                await textChannel.SendMessage("Game " + activeGame.gameName + " canceled by host " + user.name + ".");
-                activeGame = null;
+                await textChannel.SendMessage("Game " + activeGame.gameName + " canceled by host " + user.name + ".");     
+            } else if (user.id == 132875210394173440) {
+                await textChannel.SendMessage("Game " + activeGame.gameName + " canceled by admin " + user.name + ".");
             }
+
+            activeGame = null;
         }
 
         /// <summary>
@@ -482,7 +495,7 @@ namespace BanjoBot
         /// <param name="user">User to send message to.</param>
         public void printHelp(Discord.User user)
         {
-            user.SendMessage(String.Format(Resources.helpString, Assembly.GetExecutingAssembly().GetName().Version.ToString()));
+            user.SendMessage(String.Format("test", Assembly.GetExecutingAssembly().GetName().Version.ToString()));
         }
 
         /// <summary>

@@ -15,53 +15,55 @@ namespace BanjoBot
     class Game
     {
         // Constants
-        const int MAXPLAYERS    = 8;
-        const int VOTETHRESHOLD = 5;
+        public const int MAXPLAYERS    = 8;
+        public const int VOTETHRESHOLD = 5;
                 
         // Props
-        public String gameName          { get; set; }
-        public User host                { get; set; }
-        public List<User> waitingList   { get; set; }
-        public List<User> redList       { get; set; }
-        public List<User> blueList      { get; set; }
-        public Teams winner             { get; set; }
-        public List<User> cancelCalls   { get; set; }
-        public List<User> redWinCalls   { get; set; }  
-        public List<User> blueWinCalls  { get; set; }
-        public List<User> drawCalls     { get; set; }
-        public int mmrAdjustment        { get; set; }
+        public String GameName          { get; set; }
+        public Player Host                { get; set; }
+        public List<Player> WaitingList   { get; set; }
+        public List<Player> RedList       { get; set; }
+        public List<Player> BlueList      { get; set; }
+        public Teams Winner             { get; set; }
+        public List<Player> CancelCalls   { get; set; }
+        public List<Player> RedWinCalls   { get; set; }  
+        public List<Player> BlueWinCalls  { get; set; }
+        public List<Player> DrawCalls     { get; set; }
+        public bool HasStarted { get; set; }
+        public int MmrAdjustment        { get; set; }
 
         /// <summary>
-        /// Game constructor. Queries database for game name and binds host to game.
+        /// Game constructor. Queries database for game name and binds Host to game.
         /// </summary>
         /// <param name="host">User who hosted the game.</param>
-        public Game(User host)
+        public Game(Player host, int gameNumber)
         {
-            this.gameName = "BBL#" + Program.ds.getGameCounter();
-            this.host     = host;
-            waitingList   = new List<User>();
-            redList       = new List<User>();
-            blueList      = new List<User>();
-            cancelCalls   = new List<User>();
-            blueWinCalls  = new List<User>();
-            redWinCalls   = new List<User>();
-            drawCalls     = new List<User>();
-            waitingList.Add(host);
+            GameName = "BBL#" + gameNumber;
+            Host     = host;
+            HasStarted = false;
+            WaitingList   = new List<Player>();
+            RedList       = new List<Player>();
+            BlueList      = new List<Player>();
+            CancelCalls   = new List<Player>();
+            BlueWinCalls  = new List<Player>();
+            RedWinCalls   = new List<Player>();
+            DrawCalls     = new List<Player>();
+            WaitingList.Add(host);
         }
 
         /// <summary>
-        /// Adds a user to the game.
+        /// Adds a player to the game.
         /// </summary>
-        /// <param name="user">User who wishes to join.</param>
-        /// <returns>True if successful. False if game is full. Null if user already present.</returns>
-        public bool? addPlayer(User user)
+        /// <param name="player">User who wishes to join.</param>
+        /// <returns>True if successful. False if game is full. Null if player already present.</returns>
+        public bool? AddPlayer(Player player)
         {
-            if (waitingList.Count == MAXPLAYERS)
+            if (WaitingList.Count == MAXPLAYERS)
                 return false;
-            else if (waitingList.Contains(user))
+            else if (WaitingList.Contains(player))
                 return null;
 
-            waitingList.Add(user);
+            WaitingList.Add(player);
 
             return true;
         }
@@ -70,19 +72,19 @@ namespace BanjoBot
         /// Removes User from game.
         /// </summary>
         /// <param name="user">User who wishes to leave.</param>
-        /// <returns>True if sucessful. False if game is empty. Null if user not in game.</returns>
-        public bool? removePlayer(User user)
+        /// <returns>True if sucessful. False if game is empty. Null if player not in game.</returns>
+        public bool? RemovePlayer(Player user)
         {
-            if (!waitingList.Contains(user))
+            if (!WaitingList.Contains(user))
                 return null;
 
-            waitingList.Remove(user);
+            WaitingList.Remove(user);
 
-            if (waitingList.Count == 0)
+            if (WaitingList.Count == 0)
                 return false;
 
-            if(user == host)
-                host = waitingList.First();
+            if(user == Host)
+                Host = WaitingList.First();
 
             return true;
         }
@@ -90,27 +92,21 @@ namespace BanjoBot
         /// <summary>
         /// Starts the game.
         /// </summary>
-        public String startGame(Channel textChannel, User user)
+        public void StartGame()
         {
-            if (user.id != host.id)
-                return "Not host";
-            if (waitingList.Count < MAXPLAYERS)
-                return "Not enough players";
-
-            assignTeams();
-
-            return generatePassword(6);
+            AssignTeams();
+            HasStarted = true;
         }
 
         /// <summary>
         /// Assigns players in waiting list to teams of roughly equal MMR.
         /// By Kael
         /// </summary>
-        public void assignTeams()
+        public void AssignTeams()
         {
-            var numPlayers = waitingList.Count;
+            var numPlayers = WaitingList.Count;
             var mmrs = new List<int>();
-            var subsets = tryCombinations(numPlayers);
+            var subsets = TryCombinations(numPlayers);
             var storedTeams = new List<int>();
             var bestMmrDiff = double.PositiveInfinity;
 
@@ -122,9 +118,9 @@ namespace BanjoBot
                 for (int i=0; i<numPlayers; i++)
                 {
                     if (s[i] == 1)
-                        mmr1 += waitingList[i].mmr;
+                        mmr1 += WaitingList[i].Mmr;
                     else
-                        mmr2 += waitingList[i].mmr;
+                        mmr2 += WaitingList[i].Mmr;
                 }
 
                 var difference = Math.Abs(mmr1 - mmr2);
@@ -140,13 +136,10 @@ namespace BanjoBot
             for (int i=0; i<numPlayers; i++)
             {
                 if (storedTeams[i] == 1)
-                    redList.Add(waitingList[i]);
+                    RedList.Add(WaitingList[i]);
                 else
-                    blueList.Add(waitingList[i]);
+                    BlueList.Add(WaitingList[i]);
             }
-
-            // Remove the waiting list
-            waitingList = null;
         }
 
         /// <summary>
@@ -154,7 +147,7 @@ namespace BanjoBot
         /// </summary>
         /// <param name="numPlayers">Number of players in the game.</param>
         /// <returns></returns>
-        public List<List<int>> tryCombinations(int numPlayers)
+        public List<List<int>> TryCombinations(int numPlayers)
         {
             var output = new List<List<int>>();
             output.Add(new List<int>());
@@ -189,179 +182,82 @@ namespace BanjoBot
         }
 
         /// <summary>
-        /// Generates a random string of specified length using only alpha-numeric characters.
-        /// </summary>
-        /// <param name="length">Length of the string</param>
-        /// <returns>String of random characters.</returns>
-        public static String generatePassword(int length)
-        {
-            const String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var random = new Random();
-            return new String(Enumerable.Repeat(chars, length)
-              .Select(s => s[random.Next(s.Length)]).ToArray());
-        }
-
-        /// <summary>
         /// Returns the average MMR of all players on the team.
         /// </summary>
         /// <param name="team">Can be either Blue or Red.</param>
         /// <returns>Average MMR as int.</returns>
-        public int getTeamMMR(Teams team)
+        public int GetTeamMMR(Teams team)
         {
             int averageMMR = 0;
 
-            if(team == Teams.Red && redList.Count() > 0)
+            if(team == Teams.Red && RedList.Count() > 0)
             {
-                foreach (var user in redList)
+                foreach (var user in RedList)
                 {
-                    averageMMR += user.mmr;
+                    averageMMR += user.Mmr;
                 }
-                averageMMR = averageMMR / redList.Count();
+                averageMMR = averageMMR / RedList.Count();
             }
-            else if (team == Teams.Blue && blueList.Count() > 0)
+            else if (team == Teams.Blue && BlueList.Count() > 0)
             {
-                foreach (var user in blueList)
+                foreach (var user in BlueList)
                 {
-                    averageMMR += user.mmr;
+                    averageMMR += user.Mmr;
                 }
-                averageMMR = averageMMR / blueList.Count();
+                averageMMR = averageMMR / BlueList.Count();
             }
 
             return averageMMR;
         }
         
-        /// <summary>
-        /// Records votes to cancel game. Once the number of votes reaches the VOTETHREASHOLD, the game is canceled.
-        /// </summary>
-        /// <param name="user">User who voted.</param>
-        /// <returns>String indicating status</returns>
-        public String voteCancel(User user)
-        {
-            if (!waitingList.Contains(user))
-                return "not in game";
-            if (cancelCalls.Contains(user))
-                return "already voted";
-
-            cancelCalls.Add(user);
-
-            if (cancelCalls.Count >= Math.Floor((double)waitingList.Count()/2))
-                return "canceled";
-
-            return "more votes";
-        }
 
         /// <summary>
-        /// Records a vote for the winning team.
-        /// </summary>
-        /// <param name="user">User who voted.</param>
-        /// <param name="team">Team user voted for</param>
-        /// <returns>String containing status of winning team.</returns>
-        public String recordVote(User user, Teams team)
-        {
-            if (!redList.Contains(user) && !blueList.Contains(user))
-                return "not in game";
-
-            if (team == Teams.Blue)
-            {
-                if (blueWinCalls.Contains(user))
-                    return "already voted";
-                if (redWinCalls.Contains(user))
-                    redWinCalls.Remove(user);
-                if (drawCalls.Contains(user))
-                    drawCalls.Remove(user);
-                blueWinCalls.Add(user);
-                if (blueWinCalls.Count == VOTETHRESHOLD)
-                {
-                    winner = Teams.Blue;
-                    adjustStats(winner);
-                    endGame();
-                    return "blue";
-                }
-            }
-            else if (team == Teams.Red)
-            {
-                if (redWinCalls.Contains(user))
-                    return "already voted";
-                if (blueWinCalls.Contains(user))
-                    blueWinCalls.Remove(user);
-                if (drawCalls.Contains(user))
-                    drawCalls.Remove(user);
-                redWinCalls.Add(user);
-                if (redWinCalls.Count == VOTETHRESHOLD)
-                {
-                    winner = Teams.Red;
-                    adjustStats(winner);
-                    endGame();
-                    return "red";
-                }
-            }
-            else if (team ==Teams.Draw)
-            {
-                if (drawCalls.Contains(user))
-                    return "already voted";
-                if (blueWinCalls.Contains(user))
-                    blueWinCalls.Remove(user);
-                if (redWinCalls.Contains(user))
-                    redWinCalls.Remove(user);
-                drawCalls.Add(user);
-                if (drawCalls.Count == VOTETHRESHOLD)
-                {
-                    winner = Teams.Draw;
-                    endGame();
-                    return "draw";
-                }
-            }
-
-            return "more votes";
-        }
-
-        /// <summary>
-        /// Updates the Wins/Losses and MMR of all players in game depending on the winner.
+        /// Updates the Wins/Losses and MMR of all players in game depending on the Winner.
         /// </summary>
         /// <param name="winner"></param>
-        public void adjustStats(Teams winner)
+        public void AdjustStats(Teams winner)
         {
             if (winner == Teams.Blue)
             {
-                double mmrDifference = getTeamMMR(Teams.Blue) - getTeamMMR(Teams.Red);
+                double mmrDifference = GetTeamMMR(Teams.Blue) - GetTeamMMR(Teams.Red);
 
                 int MMR = Convert.ToInt32(mmrCurve(mmrDifference));
 
-                foreach (var user in blueList)
+                foreach (var user in BlueList)
                 {
-                    user.wins++;
-                    user.mmr += MMR + 2*user.streak;
-                    user.streak++;
+                    user.Wins++;
+                    user.Mmr += MMR + 2*user.Streak;
+                    user.Streak++;
                 }
-                foreach (var user in redList)
+                foreach (var user in RedList)
                 {
-                    user.losses++;
-                    user.streak = 0;
-                    user.mmr -= MMR;
-                    if (user.mmr < 0)
-                        user.mmr = 0;
+                    user.Losses++;
+                    user.Streak = 0;
+                    user.Mmr -= MMR;
+                    if (user.Mmr < 0)
+                        user.Mmr = 0;
                 }
             }
 
             if (winner == Teams.Red)
             {
-                double mmrDifference = getTeamMMR(Teams.Red) - getTeamMMR(Teams.Blue);
+                double mmrDifference = GetTeamMMR(Teams.Red) - GetTeamMMR(Teams.Blue);
 
                 int MMR = Convert.ToInt32(mmrCurve(mmrDifference));
 
-                foreach (var user in blueList)
+                foreach (var user in BlueList)
                 {
-                    user.losses++;
-                    user.streak = 0;
-                    user.mmr -= MMR;
-                    if (user.mmr < 0)
-                        user.mmr = 0;
+                    user.Losses++;
+                    user.Streak = 0;
+                    user.Mmr -= MMR;
+                    if (user.Mmr < 0)
+                        user.Mmr = 0;
                 }
-                foreach (var user in redList)
+                foreach (var user in RedList)
                 {
-                    user.wins++;
-                    user.mmr += MMR + 2 * user.streak;
-                    user.streak++;
+                    user.Wins++;
+                    user.Mmr += MMR + 2 * user.Streak;
+                    user.Streak++;
                 }
             }
         }
@@ -372,20 +268,20 @@ namespace BanjoBot
             double approaches = 10;
             double approachRate = Math.Atan(-x * (1/350.0));
             double result = approachRate * approaches + baseMMR;
-            mmrAdjustment = Convert.ToInt32(result);
+            MmrAdjustment = Convert.ToInt32(result);
             return result;
         }
 
         /// <summary>
-        /// Ends the game. Saves game data to DataBase.
+        /// Generates a random string of specified length using only alpha-numeric characters.
         /// </summary>
-        public void endGame()
-        {
-            if (redList.Count > 0 && blueList.Count > 0)
-            {
-                // Save DataStore data
-                Program.ds.writeXML();
-            }
+        /// <param name="length">Length of the string</param>
+        /// <returns>String of random characters.</returns>
+        public static String GeneratePassword(int length) {
+            const String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            return new String(Enumerable.Repeat(chars, length)
+              .Select(s => s[random.Next(s.Length)]).ToArray());
         }
     }
 }

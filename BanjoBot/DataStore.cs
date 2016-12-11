@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Discord;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,17 +11,18 @@ namespace BanjoBot
 {
     class DataStore
     {
+        private static DataStore singleton;
         //Props
         public static int gameCounter;
-        public Dictionary<ulong, User> users;
+        public Dictionary<ulong, Player> users;
         public Dictionary<String, Game> games;
 
         /// <summary>
         /// Constructor
         /// </summary>
-        public DataStore()
+        private DataStore()
         {
-            users = new Dictionary<ulong, User>();
+            users = new Dictionary<ulong, Player>();
             games = new Dictionary<string, Game>();
 
             if (File.Exists(@"lib\BanjoStore.xml"))
@@ -28,37 +30,50 @@ namespace BanjoBot
             else
                 gameCounter = 1;
         }
+
+        public static DataStore GetInstance()
+        {
+            if (singleton != null)
+            {
+                return singleton;
+            }
+            else
+            {
+                singleton = new DataStore();
+                return singleton;
+            }
+        }
        
         /// <summary>
         /// Gets the user from the DataStore or creates a new one and adds it to the DataStore.
         /// </summary>
-        /// <param name="id">User's id</param>
-        /// <param name="name">User's name</param>
+        /// <param _name="id">User's ID</param>
+        /// <param _name="name">User's _name</param>
         /// <returns>The User.</returns>
-        public User getUser(ulong id, String name, String mention)
+        public Player getPlayer(ulong id, String name, String mention, User user)
         {
             // If user exists in DataStore
             if (users.ContainsKey(id))
             {
                 // Used to upgrade data in BanjoStore from v1.2
-                if (users[id].mention == "")
-                    users[id].mention = mention;
+                if (users[id].Mention == "")
+                    users[id].Mention = mention;
                 return users[id];
             }
 
 
-            User user = new User(id, name, mention);
-            users.Add(user.id, user);
+            Player player = new Player(id, name, mention, user);
+            users.Add(player.ID, player);
 
-            return user;
+            return player;
         }
 
         /// <summary>
-        /// Gets the user from the DataStore. Returns null if user does not exist.
+        /// Gets the user from the DataStore. Returns null if _user does not exist.
         /// </summary>
-        /// <param name="id">User's ID.</param>
+        /// <param _name="id">User's ID.</param>
         /// <returns>The User if it exists, null otherwise.</returns>
-        public User getUser(ulong id)
+        public Player getPlayer(ulong id)
         {
             // If user exists in DataStore
             if (users.ContainsKey(id))
@@ -109,13 +124,13 @@ namespace BanjoBot
                 {
                     // User Element
                     writer.WriteStartElement("User");
-                    writer.WriteElementString("ID", obj.Value.id.ToString());
-                    writer.WriteElementString("Name", obj.Value.name);
-                    writer.WriteElementString("Mention", obj.Value.mention);
-                    writer.WriteElementString("MMR", obj.Value.mmr.ToString());
-                    writer.WriteElementString("Wins", obj.Value.wins.ToString());
-                    writer.WriteElementString("Losses", obj.Value.losses.ToString());
-                    writer.WriteElementString("Streak", obj.Value.streak.ToString());
+                    writer.WriteElementString("ID", obj.Value.ID.ToString());
+                    writer.WriteElementString("Name", obj.Value.Name);
+                    writer.WriteElementString("Mention", obj.Value.Mention);
+                    writer.WriteElementString("MMR", obj.Value.Mmr.ToString());
+                    writer.WriteElementString("Wins", obj.Value.Wins.ToString());
+                    writer.WriteElementString("Losses", obj.Value.Losses.ToString());
+                    writer.WriteElementString("Streak", obj.Value.Streak.ToString());
                     writer.WriteFullEndElement();
                 }
                 writer.WriteEndElement();
@@ -143,10 +158,10 @@ namespace BanjoBot
             nodes = document.GetElementsByTagName("User");
             foreach (XmlNode node in nodes)
             {
-                User user;
+                Player user;
                 if (node.ChildNodes.Count == 7)
                 {
-                    user = new User(
+                    user = new Player(
                         Convert.ToUInt64(node.ChildNodes[0].InnerText),
                         node.ChildNodes[1].InnerText,
                         node.ChildNodes[2].InnerText,
@@ -159,7 +174,7 @@ namespace BanjoBot
                 // for upgrading existing XML file to be compatible with BanjoBot v1.2
                 else
                 {
-                    user = new User(
+                    user = new Player(
                         Convert.ToUInt64(node.ChildNodes[0].InnerText),
                         node.ChildNodes[1].InnerText,
                         Convert.ToInt32(node.ChildNodes[2].InnerText),
@@ -169,7 +184,7 @@ namespace BanjoBot
                         );
                 }
 
-                users.Add(user.id, user);
+                users.Add(user.ID, user);
             }
         }
     }
