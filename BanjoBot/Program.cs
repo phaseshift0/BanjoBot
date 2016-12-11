@@ -30,7 +30,7 @@ namespace BanjoBot
             _bot.ExecuteAndWait(async () => {
                 Console.WriteLine("Login...");
                 try {
-                    await _bot.Connect("MjU2NDg3NzU2MDkwNDQxNzI4.Cyuqiw.DymM61i0LuBvlV46ciI_5uCstMc", TokenType.Bot);
+                    await _bot.Connect("XXXX", TokenType.Bot);
                 } catch (Discord.Net.HttpException e) {
                     Console.WriteLine(e.Message);
                     Console.WriteLine("Login failed");
