@@ -1,0 +1,5 @@
+setup-x86_64.exe -q -P autoconf,automake,bison,gcc-core,gcc-g++,mingw64-i686-runtime,mingw64-i686-binutils,mingw64-i686-gcc-cor,ming-i686-gcc-g++,mingw64-i686-pthreads,mingw64-i686-w32api,mingw64-x86_64-runtime,mingw64-x86_64-binutils,mingw64-x86_64-gcc-cor,mingw6-x86_64-gcc-g++,mingw64-x86_64-pthreads,mingw64-x86_64-w32api,libtool,make,python,gettext-devel,gettext,intltool,libiconv,pkg-config,git,curl,libxslt
+
+mkbundle --deps -o BanjoBot BanjoBot.exe lib/Discord.Net.dll lib/Nito.AsyncEx.dll lib/Nito.AsyncEx.Enlightenment.dll lib/Newtonsoft.Json.dll lib/Nito.AsyncEx.Concurrent.dll lib/WebSocket4Net.dll lib/RestSharp.dll lib/Discord.Net.Commands.dll
+
+http://stackoverflow.com/questions/22226519/how-to-make-mkbundle-deps-option-working-with-mono-3-2-3/32926696#32926696
