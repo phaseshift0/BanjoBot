@@ -12,60 +12,114 @@ namespace BanjoBot
 {
     class Program
     {
+        //TODO: remove _ls
         private const String BBL_SIGNUP_URL = "http://www.goo.gl/JbOfGE";
         private static DataStore _dataStore;
         private static LeagueController _ls;
         private static DiscordClient _bot;
         private static List<League> _leagues;
         private static String _allLeagues;
-        private static List<Server> _servers;
+        private static List<Server> _connectedServers;
+        private static List<MatchMakingServer> _allServers;
 
         static void Main(string[] args)
         {
-            // Create _bot
             _bot = new DiscordClient();
             _bot.ServerAvailable += ServerConnected;
-            _servers = new List<Server>();
+            _bot.ServerUnavailable += ServerDisconnected;
+            _connectedServers = new List<Server>();
+            _allServers = new List<MatchMakingServer>();
+
+            // Initialise commands
+            Console.WriteLine("Initialising commands...");
+            InitialiseCommands(); 
+
             // Login to Discord
-            _bot.ExecuteAndWait(async () => {
-                Console.WriteLine("Login...");
-                try {
-                    await _bot.Connect("MjU2NDg3NzU2MDkwNDQxNzI4.Cyuqiw.DymM61i0LuBvlV46ciI_5uCstMc", TokenType.Bot);
-                } catch (Discord.Net.HttpException e) {
-                    Console.WriteLine(e.Message);
-                    Console.WriteLine("Login failed");
+            _bot.ExecuteAndWait(async () =>
+            {
+                bool loginSuccessful = false;
+                while (!loginSuccessful)
+                {
+                    Console.WriteLine("Login...");
+                    try {
+                        await _bot.Connect("MjU2NDg3NzU2MDkwNDQxNzI4.Cy-npA.zCjYPcnfTvqalIGcuewc951xXVY", TokenType.Bot);
+                        loginSuccessful = true;
+                    } catch (Discord.Net.HttpException e) {
+                        Console.WriteLine(e.Message);
+                        Console.WriteLine("Login failed");
+                    }
                 }
                 Console.Out.WriteLine("BanjoBot online.");
             });
         }
 
+        private static void LoadServerInformation(Server server)
+        {
+            Console.WriteLine("Downloading server information...");
+
+            //TODO: load server information from sql server
+            MatchMakingServer matchMakingServer = new MatchMakingServer(server);  //TODO: createServerFromSql, createLeagueFromSql, createPlayersfromSql
+            if (matchMakingServer != null)
+            {
+                _allServers.Add(matchMakingServer);
+                _ls = new LeagueController(matchMakingServer, null); //TODO: Move to MyServer Constructor _
+            }
+            else
+            {
+                
+            }
+
+            // Set up the DataStore
+            Console.WriteLine("Loading player stats...");
+            _dataStore = DataStore.GetInstance();
+        }
+
         private static void ServerConnected(object sender, ServerEventArgs e)
         {
-            if (!_servers.Contains(e.Server))
+            if (!_connectedServers.Contains(e.Server))
             {
-                _servers.Add(e.Server);
-                Console.WriteLine(e.Server.Name);
-                // Set up the DataStore
-                Console.WriteLine("Loading player stats...");
-                _dataStore = DataStore.GetInstance();
+                _connectedServers.Add(e.Server);
+                Console.WriteLine("Bot connected to a new server: " + e.Server.Name + "(" + e.Server.Id + ")");
 
-                // Set up LeagueConroller
-                Server server = e.Server;
-                _ls = new LeagueController(server, _dataStore);
-                _leagues = _ls.GetLeagues();
-                foreach (League l in _leagues) {
-                    _allLeagues += l.Channel.Mention + " ";
-                }
+                // Load server information if necessary 
+                if(IsServerInitialised(e.Server))
+                    LoadServerInformation(e.Server);
 
-                // Initialise commands
-                Console.WriteLine("Initialising commands...");
-                InitialiseCommands();
+              
             }
         }
 
-        private static void CommandError(object sender, CommandErrorEventArgs e)
+        private static bool IsServerInitialised(Server server)
         {
-            e.User.SendMessage(e.Exception.Message);
+            foreach (MatchMakingServer myServer in _allServers)
+            {
+                if (myServer.DiscordServer.Id == server.Id)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private MatchMakingServer getMyServer(Server server)
+        {
+            foreach (MatchMakingServer myServer in _allServers) {
+                if (myServer.DiscordServer.Id == server.Id)
+                    return myServer;
+            }
+
+            return null;
+        }
+
+        private static void ServerDisconnected(object sender, ServerEventArgs e)
+        {
+            _connectedServers.Remove(e.Server);
+        }
+
+
+        private static async void CommandError(object sender, CommandErrorEventArgs e)
+        {
+            if(e.Exception.Message != "")
+                await e.User.SendMessage(e.Exception.Message);
         }
 
      
@@ -75,6 +129,9 @@ namespace BanjoBot
         /// </summary>
         private static void InitialiseCommands()
         {
+            // TODO: AddCheck to all commands (if Server is not in _AllServers)
+            // TODO: CheckIFRegistered should check if users is registered for the _correct_ server
+            // TODO: CheckIFLeagueChannel check league channel for the _correct_ server
             // Create command service
             var commandService = new CommandService(new CommandServiceConfigBuilder
             {
@@ -88,7 +145,7 @@ namespace BanjoBot
 
             // Create !hostgame command
             commands.CreateCommand("hostgame")                                      
-                    .Alias(new string[] { "host", "hg" })                                               // Command aliases, can be called with !Host or !hg
+                    .Alias(new string[] { "host", "hg" })                               
                     .Description("Creates a new game (only one game may be in the lobby at a time).")
                     .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
                     .AddCheck(CheckIfLeagueChannel, "This is no league channel. Join " + _allLeagues + " and try again")
@@ -96,7 +153,7 @@ namespace BanjoBot
                     {
                         // Get or create user
                         Player user;
-                        if (e.User.Nickname != null)
+                        if (e.User.Nickname != null) 
                             user = _dataStore.getPlayer(e.User.Id, e.User.Nickname, e.User.NicknameMention, e.User);
                         else
                             user = _dataStore.getPlayer(e.User.Id, e.User.Name, e.User.Mention, e.User);
@@ -127,6 +184,8 @@ namespace BanjoBot
             commands.CreateCommand("leave")
                     .Alias(new string[] { "l" })
                     .Description("Leaves the open game.")
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Do(async e =>
                     {
                         // Get or create user
@@ -143,6 +202,8 @@ namespace BanjoBot
             commands.CreateCommand("cancelgame")
                     .Alias(new string[] { "cancel", "c" })
                     .Description("Cancels the open game.")
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Do(async e =>
                     {
                         // Get or create user
@@ -159,6 +220,8 @@ namespace BanjoBot
             commands.CreateCommand("votecancel")
                     .Alias(new string[] { "vc" })
                     .Description("Casts a vote to cancel the open game.")
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Do(async e =>
                     {
                         // Get or create user
@@ -175,6 +238,8 @@ namespace BanjoBot
             commands.CreateCommand("startgame")
                     .Alias(new string[] { "start", "sg" })
                     .Description("Start the game. Host only, requires full game.")
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Do(async e =>
                     {
                         // Get or create user
@@ -190,6 +255,8 @@ namespace BanjoBot
             // Create !getplayers command
             commands.CreateCommand("getplayers")
                     .Alias(new string[] { "players", "list", "gp" })
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Description("Shows the players that have joined the open game.")
                     .Do(async e =>
                     {
@@ -199,8 +266,10 @@ namespace BanjoBot
             // Create !showstats command
             commands.CreateCommand("getstats")
                     .Alias(new string[] { "stats", "gs" })
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Description("Shows the league stats of a player.")
-                    .Parameter("target", ParameterType.Required)                                            // As an argument. Target of the !getstats command
+                    .Parameter("target", ParameterType.Required)  
                     .Do(async e =>
                     {
                         // Get or create user
@@ -216,6 +285,8 @@ namespace BanjoBot
             // Create !getgames command
             commands.CreateCommand("getgames")
                     .Alias(new string[] { "games", "gg" })
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Description("Shows the status of all games.")
                     .Do(async e =>
                     {
@@ -225,6 +296,8 @@ namespace BanjoBot
             // Create !bluewins command
             commands.CreateCommand("bluewins")
                     .Alias(new string[] { "blue", "bw" })
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Description("Cast vote for Blue Team as the winner of game BBL#X (post game only).")
                     .Do(async e =>
                     {
@@ -241,6 +314,8 @@ namespace BanjoBot
             // Create !redwins command
             commands.CreateCommand("redwins")
                     .Alias(new string[] { "red", "rw" })
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Description("Cast vote for Red Team as the winner of game BBL#X (post game only).")
                     .Do(async e =>
                     {
@@ -257,6 +332,8 @@ namespace BanjoBot
             // Create !draw command
             commands.CreateCommand("draw")
                     .Alias(new string[] { "d" })
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Description("Cast vote for a tied game for BBL#X (post game only).")
                     .Do(async e =>
                     {
@@ -273,26 +350,91 @@ namespace BanjoBot
             // Create !topmmr command
             commands.CreateCommand("topmmr")
                     .Alias(new string[] { "top", "t" })
+                    .AddCheck(CheckIfRegistered, "You are not signed up. Sign up here: " + BBL_SIGNUP_URL + " and contact a League Moderator")
+                    .AddCheck(CheckIfLeagueChannel)
                     .Description("Shows the top 5 players by MMR.")
                     .Do(async e =>
                     {
                         await _ls.getTopMMR(e.Channel, _dataStore);
                     });
 
-            // Create !help command
+            // TODO: Create !help command
             commands.CreateCommand("help")
                     .Alias(new string[] { "h" })
                     .Description("Shows the help.")
                     .Do(e =>
                     {
-                        _ls.printHelp(e.User);
+                        //_ls.printHelp(e.User);
                     });
 
-            // Create !save command
-            commands.CreateCommand("save")
+            // TODO:  Create !getDetailedStats
+            commands.CreateCommand("getDetailedStats")
+                   .Alias(new string[] { "h" })
+                   .Description("Shows the help.")
+                   .Do(e => {
+                      
+                   });
+
+
+
+            // Admin commands
+            // TODO: Create !createLeague command
+            // No parameter -> current Channel, Parameter: #channel
+            commands.CreateCommand("createLeague")
                     .Description("Saves the stats of all users. (Only useable by admins)")
-                    .Do(e =>
-                    {
+                    .Do(e => {
+                
+                    });
+
+            // TODO: Create !registerLeague command
+            commands.CreateCommand("registerLeague")
+                    .Description("Saves the stats of all users. (Only useable by admins)")
+                    .Do(e => {
+                        
+                    });
+
+            // TODO: Create !createModChannel
+            // Registers all roles with write permission to mod roles
+            commands.CreateCommand("createModChannel")
+                    .Description("Saves the stats of all users. (Only useable by admins)")
+                    .Do(e => {
+                      
+                    });
+
+            // TODO: Create !registerModChannel
+            // Registers all roles with write permission to mod roles
+            commands.CreateCommand("registerModChannel")
+                    .Description("Saves the stats of all users. (Only useable by admins)")
+                    .Do(e => {
+                      
+                    });
+
+            // TODO: Create !warn
+            commands.CreateCommand("warn")
+                    .Description("Saves the stats of all users. (Only useable by admins)")
+                    .Do(e => {
+                        
+                    });
+
+            // TODO: Create !setAutoSeasons
+            // Automated starting and ending of all Seasons
+            commands.CreateCommand("setAutoLeague")
+                    .Description("Saves the stats of all users. (Only useable by admins)")
+                    .Do(e => {
+                      
+                    });
+
+            // TODO: Create !startSeason
+            commands.CreateCommand("startSeason")
+                    .Description("Saves the stats of all users. (Only useable by admins)")
+                    .Do(e => {
+                       
+                    });
+
+            // TODO: Create !stopSeason
+            commands.CreateCommand("stopSeason")
+                    .Description("Saves the stats of all users. (Only useable by admins)")
+                    .Do(e => {
                         _ls.saveData(e.User.Id);
                     });
         }

@@ -12,33 +12,35 @@ namespace BanjoBot
     class LeagueController
     {
         private List<League> _leagues;
-        private readonly Server _server;
-        private readonly DataStore _dataStore;
-        private readonly Role _moderatoRole;
-        private readonly Role _adminRole;
+        private League _league;
+        private MatchMakingServer _server;
+        private DataStore _dataStore;
+        private Role _moderatoRole;
+        private Role _adminRole;
 
-        public LeagueController(Server server, DataStore ds)
+        public LeagueController(MatchMakingServer server, League league)
         {
-            _dataStore = ds;
+            //TODO: LeagueController 1-1 dependency to league
+            //TODO: Move controlling methods from league to LeagueController
             _server = server;
             _leagues = new List<League>();
             CreateLeagues();
-            _moderatoRole =_server.FindRoles("League Moderator", true).First();
-            _adminRole =_server.FindRoles("Server Admin", true).First();
+            //_moderatoRole =_server.FindRoles("League Moderator", true).First();
+            //_adminRole =_server.FindRoles("Server Admin", true).First();
         }
 
 
         private void CreateLeagues()
         {
-            var role = _server.FindRoles("EU-BBL", true).First();
-            var channel = _server.FindChannels("eu-bbl", null, true).First();
-            _leagues.Add(new League("EU-BBL", channel,role));
-            role = _server.FindRoles("AUS-BBL", true).First();
-            channel = _server.FindChannels("aus-bbl", null, true).First();
-            _leagues.Add(new League("AUS-BBL", channel, role));
-            role = _server.FindRoles("NA-BBL", true).First();
-            channel = _server.FindChannels("na-bbl", null, true).First();
-            _leagues.Add(new League("NA-BBL",channel, role));
+            //var role = _server.FindRoles("EU-BBL", true).First();
+            //var channel = _server.FindChannels("eu-bbl", null, true).First();
+            //_leagues.Add(new League("EU-BBL", channel,role));
+            //role = _server.FindRoles("AUS-BBL", true).First();
+            //channel = _server.FindChannels("aus-bbl", null, true).First();
+            //_leagues.Add(new League("AUS-BBL", channel, role));
+            //role = _server.FindRoles("NA-BBL", true).First();
+            //channel = _server.FindChannels("na-bbl", null, true).First();
+            //_leagues.Add(new League("NA-BBL",channel, role));
         }
 
         public List<League> GetLeagues()

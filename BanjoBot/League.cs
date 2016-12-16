@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace BanjoBot {
     class League {
+        private List<Player> _allPlayers;
         private Game _activeGame;
         private List<Game> _runningGames;
         public Channel Channel { get; set; }
