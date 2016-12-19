@@ -19,6 +19,7 @@ namespace BanjoBot
         public const int VOTETHRESHOLD = 5;
                 
         // Props
+        public int LeagueID { get; set; }
         public String GameName          { get; set; }
         public Player Host                { get; set; }
         public List<Player> WaitingList   { get; set; }
@@ -36,10 +37,11 @@ namespace BanjoBot
         /// Game constructor. Queries database for game name and binds Host to game.
         /// </summary>
         /// <param name="host">User who hosted the game.</param>
-        public Game(Player host, int gameNumber)
+        public Game(Player host, int gameNumber, int leagueID)
         {
             GameName = "BBL#" + gameNumber;
             Host     = host;
+            LeagueID = leagueID;
             HasStarted = false;
             WaitingList   = new List<Player>();
             RedList       = new List<Player>();
@@ -118,9 +120,9 @@ namespace BanjoBot
                 for (int i=0; i<numPlayers; i++)
                 {
                     if (s[i] == 1)
-                        mmr1 += WaitingList[i].Mmr;
+                        mmr1 += WaitingList[i].GetMMR(LeagueID);
                     else
-                        mmr2 += WaitingList[i].Mmr;
+                        mmr2 += WaitingList[i].GetMMR(LeagueID);
                 }
 
                 var difference = Math.Abs(mmr1 - mmr2);
@@ -194,7 +196,7 @@ namespace BanjoBot
             {
                 foreach (var user in RedList)
                 {
-                    averageMMR += user.Mmr;
+                    averageMMR += user.GetMMR(LeagueID);
                 }
                 averageMMR = averageMMR / RedList.Count();
             }
@@ -202,7 +204,7 @@ namespace BanjoBot
             {
                 foreach (var user in BlueList)
                 {
-                    averageMMR += user.Mmr;
+                    averageMMR += user.GetMMR(LeagueID);
                 }
                 averageMMR = averageMMR / BlueList.Count();
             }
@@ -225,17 +227,17 @@ namespace BanjoBot
 
                 foreach (var user in BlueList)
                 {
-                    user.Wins++;
-                    user.Mmr += MMR + 2*user.Streak;
-                    user.Streak++;
+                    user.IncWins(LeagueID);
+                    user.IncMMR(LeagueID,MMR + 2*user.GetStreak(LeagueID));
+                    user.IncStreak(LeagueID);
                 }
                 foreach (var user in RedList)
                 {
-                    user.Losses++;
-                    user.Streak = 0;
-                    user.Mmr -= MMR;
-                    if (user.Mmr < 0)
-                        user.Mmr = 0;
+                    user.IncLosses(LeagueID);
+                    user.SetStreakZero(LeagueID);
+                    user.DecMMR(LeagueID,MMR);
+                    if (user.GetMMR(LeagueID) < 0)
+                        user.SetMMR(LeagueID,0);
                 }
             }
 
@@ -247,17 +249,17 @@ namespace BanjoBot
 
                 foreach (var user in BlueList)
                 {
-                    user.Losses++;
-                    user.Streak = 0;
-                    user.Mmr -= MMR;
-                    if (user.Mmr < 0)
-                        user.Mmr = 0;
+                    user.IncLosses(LeagueID);
+                    user.SetStreakZero(LeagueID);
+                    user.DecMMR(LeagueID,MMR);
+                    if (user.GetMMR(LeagueID) < 0)
+                        user.SetMMR(LeagueID, 0);
                 }
                 foreach (var user in RedList)
                 {
-                    user.Wins++;
-                    user.Mmr += MMR + 2 * user.Streak;
-                    user.Streak++;
+                    user.IncWins(LeagueID);
+                    user.IncMMR(LeagueID,MMR + 2 * user.GetStreak(LeagueID));
+                    user.IncStreak(LeagueID);
                 }
             }
         }

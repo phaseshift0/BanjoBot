@@ -11,77 +11,77 @@ namespace BanjoBot
 {
     class LeagueController
     {
-        private List<League> _leagues;
-        private League _league;
+        //TODO: ModeratorRole to league and AdminRole to MyServer
+        public League League;
         private MatchMakingServer _server;
-        private DataStore _dataStore;
-        private Role _moderatoRole;
-        private Role _adminRole;
+        private Game ActiveGame { get; set; }
+        private List<Game> RunningGames { get; set; }
+        public bool AutoAccept { get; set; } = true;
 
         public LeagueController(MatchMakingServer server, League league)
         {
-            //TODO: LeagueController 1-1 dependency to league
-            //TODO: Move controlling methods from league to LeagueController
+            RunningGames = new List<Game>();
             _server = server;
-            _leagues = new List<League>();
-            CreateLeagues();
-            //_moderatoRole =_server.FindRoles("League Moderator", true).First();
-            //_adminRole =_server.FindRoles("Server Admin", true).First();
+            League = league;
         }
 
-
-        private void CreateLeagues()
-        {
-            //var role = _server.FindRoles("EU-BBL", true).First();
-            //var channel = _server.FindChannels("eu-bbl", null, true).First();
-            //_leagues.Add(new League("EU-BBL", channel,role));
-            //role = _server.FindRoles("AUS-BBL", true).First();
-            //channel = _server.FindChannels("aus-bbl", null, true).First();
-            //_leagues.Add(new League("AUS-BBL", channel, role));
-            //role = _server.FindRoles("NA-BBL", true).First();
-            //channel = _server.FindChannels("na-bbl", null, true).First();
-            //_leagues.Add(new League("NA-BBL",channel, role));
+        public bool LobbyExists() {
+            return ActiveGame != null;
         }
 
-        public List<League> GetLeagues()
-        {
-            return _leagues;
-        } 
+        public void CancelGame() {
+            ActiveGame = null;
+        }
+
+        public void StartGame() {
+            foreach (Player player in ActiveGame.WaitingList) {
+                player.CurrentGame = ActiveGame;
+            }
+            ActiveGame.StartGame();
+            RunningGames.Add(ActiveGame);
+            ActiveGame = null;
+        }
+
+        public void CloseGame(Game game, Teams winnerTeam) {
+            game.AdjustStats(winnerTeam);
+            RunningGames.Remove(game);
+            foreach (Player player in game.WaitingList) {
+                player.CurrentGame = null;
+            }
+
+            //saveData(); //TODO:
+        }
+
+        public async Task<Game> HostGame(Player host) {
+            //TODO: only increment gamecounter on finish
+            Game game = new Game(host, League.GameCounter + 1,League.LeagueID);
+            ActiveGame = game;
+            return game;
+        }
+
 
         /// <summary>
         /// Creates a new Game, binding the host and broadcasting to the Channel.
         /// </summary>
         /// <param name="textChannel">The Channel to be broadcasted to.</param>
         /// <param name="host">The User who hosted the game.</param>
-        public async Task hostGame(Channel textChannel, Player host)
+        public async Task TryHostGame(Channel textChannel, Player host)
         {
-            League league = GetLeagueByChannel(textChannel);
-
             if (host.IsIngame())
             {
-                await writeMessage(textChannel, host.Mention + " Vote before hosting another game");
+                await writeMessage(textChannel, host.User.Mention + " Vote before hosting another game");
                 return;
             }
 
             // If no games are open.
-            if (league.LobbyExists())
+            if (LobbyExists())
             {
                 
-                Game newGame = league.HostGame(host);
+                Game newGame = await HostGame(host);
                 await textChannel.SendMessage("New game " + newGame.GameName + " hosted by " + host.ToString() + ". \nType !join to join the game. (" + newGame.WaitingList.Count() + "/8)");
             } else { 
-                await writeMessage(textChannel, host.Mention + " Game " + league.GetActiveGame().GameName + " is already open. Only one game may be hosted at a time. \nType !join to join the game.");
+                await writeMessage(textChannel, host.User.Mention + " Game " + ActiveGame.GameName + " is already open. Only one game may be hosted at a time. \nType !join to join the game.");
             }
-        }
-
-        public League GetLeagueByChannel(Channel channel)
-        {
-            foreach (League league in _leagues)
-            {
-                if (league.Channel == channel)
-                    return league;
-            }
-            return null;
         }
 
         /// <summary>
@@ -92,36 +92,35 @@ namespace BanjoBot
         public async Task joinGame(Channel textChannel, Player player)
         {
             Console.WriteLine("joinGame()");
-            League league = GetLeagueByChannel(textChannel);  
             if (player.IsIngame())
             {
-                await writeMessage(textChannel, player.Mention + " Vote before joining another game");
+                await writeMessage(textChannel, player.User.Mention + " Vote before joining another game");
                 return;
             } 
-            if (league.LobbyExists())
+            if (LobbyExists())
             {
                 await writeMessage(textChannel, "No games open. Type !hostgame to create a game.");
                 return;
             }
 
             // Attempt to add player
-            bool? addPlayerResult = league.GetActiveGame().AddPlayer(player);
+            bool? addPlayerResult = ActiveGame.AddPlayer(player);
 
             // If successful
             if (addPlayerResult == true)
             {
-                await textChannel.SendMessage(player.ToString() + " has joined " + league.GetActiveGame().GameName + ". (" + league.GetActiveGame().WaitingList.Count() + "/8)");
-                if (league.GetActiveGame().WaitingList.Count() == 8) { 
-                    await textChannel.SendMessage(league.GetActiveGame().Host.Mention + ", The lobby is full. Type !startgame to start the game");
+                await textChannel.SendMessage(player.PlayerMMRString(League.LeagueID) + " has joined " + ActiveGame.GameName + ". (" + ActiveGame.WaitingList.Count() + "/8)");
+                if (ActiveGame.WaitingList.Count() == 8) { 
+                    await textChannel.SendMessage(ActiveGame.Host.User.Mention + ", The lobby is full. Type !startgame to start the game");
                 }
             }
 
             // If unsuccessfull
             else if (addPlayerResult == false)
-                await writeMessage(textChannel, player.Mention + " The game " + league.GetActiveGame().GameName + " is full.");
+                await writeMessage(textChannel, player.User.Mention + " The game " + ActiveGame.GameName + " is full.");
             // If player already in game
             else if (addPlayerResult == null)
-                await writeMessage(textChannel, player.Mention + " you can not join a game you are already in.");
+                await writeMessage(textChannel, player.User.Mention + " you can not join a game you are already in.");
             else
                 await writeMessage(textChannel, "Error: Command.joinGame()");
         }
@@ -133,30 +132,29 @@ namespace BanjoBot
         /// <param name="user">User who wishes to leave.</param>
         public async Task leaveGame(Channel textChannel, Player user)
         {
-            League league = GetLeagueByChannel(textChannel);
             // If no games are open.
-            if (league.LobbyExists())
+            if (LobbyExists())
             {
                 await writeMessage(textChannel, "No games open. Type !hostgame to create a game.");
                 return;
             }
 
             // Attempt to remove player
-            bool? removePlayerResult = league.GetActiveGame().RemovePlayer(user);
+            bool? removePlayerResult = ActiveGame.RemovePlayer(user);
 
             // If successful
             if (removePlayerResult == true)
-                await textChannel.SendMessage(user.ToString() + " has left " + league.GetActiveGame().GameName + ". (" + league.GetActiveGame().WaitingList.Count() + "/8)");
+                await textChannel.SendMessage(user.ToString() + " has left " + ActiveGame.GameName + ". (" + ActiveGame.WaitingList.Count() + "/8)");
             // If game now empty
             else if (removePlayerResult == false)
             {
-                await writeMessage(textChannel, user.ToString() + " has left " + league.GetActiveGame().GameName + ". (" + league.GetActiveGame().WaitingList.Count() + "/8)");
-                await writeMessage(textChannel,"Closing game " + league.GetActiveGame().GameName);
-                league.CancelGame();
+                await writeMessage(textChannel, user.ToString() + " has left " + ActiveGame.GameName + ". (" + ActiveGame.WaitingList.Count() + "/8)");
+                await writeMessage(textChannel,"Closing game " + ActiveGame.GameName);
+                CancelGame();
             }
             // If player not in game
             else if (removePlayerResult == null)
-                await writeMessage(textChannel, user.Mention + " you are not in this game.");
+                await writeMessage(textChannel, user.User.Mention + " you are not in this game.");
             else
                 await writeMessage(textChannel, "Error: Command.leaveGame()");
         }
@@ -168,38 +166,36 @@ namespace BanjoBot
         /// <param name="playerUser who wishes to leave.</param>
         public async Task startGame(Channel textChannel, Player player)
         {
-            League league = GetLeagueByChannel(textChannel);
-            Game activeGame = league.GetActiveGame();
-            if (!league.LobbyExists())
+            if (!LobbyExists())
             {
                 await writeMessage(textChannel, "No games open. Type !hostgame to create a game.");
                 return;
             }
 
             // If the player who started the game was not the host
-            if (activeGame.Host != player) { 
-                await writeMessage(textChannel, player.Mention + " only the host (" + activeGame.Host.Name + ") can start the game.");
+            if (ActiveGame.Host != player) { 
+                await writeMessage(textChannel, player.User.Mention + " only the host (" + ActiveGame.Host.User.Name + ") can start the game.");
                 return;
-            }else if (activeGame.WaitingList.Count < Game.MAXPLAYERS) { 
-                await writeMessage(textChannel, player.Mention + " you need 8 players to start the game.");
+            }else if (ActiveGame.WaitingList.Count < Game.MAXPLAYERS) { 
+                await writeMessage(textChannel, player.User.Mention + " you need 8 players to start the game.");
                 return;
             }
 
             // If the game sucessfully started
-            await textChannel.SendMessage(league.GetActiveGame().GameName + " has been started by " + player.ToString() + ".");
-            league.StartGame();
+            await textChannel.SendMessage(ActiveGame.GameName + " has been started by " + player.PlayerMMRString(League.LeagueID) + ".");
+            StartGame();
             // Prepare Blue Team
-            String blueTeam = "Blue Team (" + activeGame.GetTeamMMR(Teams.Blue) + "): ";
-            foreach (var p in activeGame.BlueList)
+            String blueTeam = "Blue Team (" + ActiveGame.GetTeamMMR(Teams.Blue) + "): ";
+            foreach (var p in ActiveGame.BlueList)
             {
-                blueTeam += player.Mention + "(" + player.Mmr + ") ";   
+                blueTeam += player.User.Mention + "(" + player.GetMMR(League.LeagueID) + ") ";   
             }
 
             // Prepare Red Team
-            String redTeam = "Red Team (" + activeGame.GetTeamMMR(Teams.Red) + "): ";
-            foreach (var p in activeGame.RedList)
+            String redTeam = "Red Team (" + ActiveGame.GetTeamMMR(Teams.Red) + "): ";
+            foreach (var p in ActiveGame.RedList)
             {
-                redTeam += player.Mention + "(" + player.Mmr + ") ";
+                redTeam += player.User.Mention + "(" + player.GetMMR(League.LeagueID) + ") ";
             }
 
             // Broadcast teams and password
@@ -215,17 +211,16 @@ namespace BanjoBot
         /// <param name="player">User who called the function.</param>
         public async Task cancelGame(Channel textChannel, Player player)
         {
-            League league = GetLeagueByChannel(textChannel);
-            if (league.LobbyExists())
+            if (LobbyExists())
             {
                 await textChannel.SendMessage("No games open. Type !hostgame to create a game.");
                 return;
             }
 
-            if (player == league.GetActiveGame().Host || player.User.HasRole(_moderatoRole) || player.User.HasRole(_adminRole))
+            if (player == ActiveGame.Host || player.User.HasRole(_server.ModeratorRole) || player.User.HasRole(_server.AdminRole))
             {
-                await textChannel.SendMessage("Game " + league.GetActiveGame().GameName + " canceled by host " + player.Name + ".");     
-                league.CancelGame();
+                await textChannel.SendMessage("Game " + ActiveGame.GameName + " canceled by host " + player.User.Name + ".");     
+                CancelGame();
             } 
         }
 
@@ -237,50 +232,46 @@ namespace BanjoBot
         public async Task voteCancel(Channel textChannel, Player player)
         {
             Console.WriteLine("!vc");
-            League league = GetLeagueByChannel(textChannel);
-            Game activeGame = league.GetActiveGame();
-            if (activeGame == null)
+            if (ActiveGame == null)
             {
                 await writeMessage(textChannel, "No games open. Type !hostgame to create a game.");
                 return;
             }
 
-            if (!activeGame.WaitingList.Contains(player)) { 
-                await writeMessage(textChannel, player.Mention + " only players who were in the game can vote.");
+            if (!ActiveGame.WaitingList.Contains(player)) { 
+                await writeMessage(textChannel, player.User.Mention + " only players who were in the game can vote.");
                 return;
             }
-            if (activeGame.CancelCalls.Contains(player)) { 
-                await writeMessage(textChannel, player.Mention + " you have already voted.");
+            if (ActiveGame.CancelCalls.Contains(player)) { 
+                await writeMessage(textChannel, player.User.Mention + " you have already voted.");
                 return;
             }
 
-            activeGame.CancelCalls.Add(player);
-            if (activeGame.CancelCalls.Count >= Math.Floor((double) activeGame.WaitingList.Count()/2))
+            ActiveGame.CancelCalls.Add(player);
+            if (ActiveGame.CancelCalls.Count >= Math.Floor((double) ActiveGame.WaitingList.Count()/2))
             {
-                await textChannel.SendMessage("Vote recorded to cancel game by " + player.Name + " (" + activeGame.CancelCalls.Count() + "/"+(int)(activeGame.WaitingList.Count/2)+")");
+                await textChannel.SendMessage("Vote recorded to cancel game by " + player.User.Name + " (" + ActiveGame.CancelCalls.Count() + "/"+(int)(ActiveGame.WaitingList.Count/2)+")");
             }
             else
             {
-                await textChannel.SendMessage("Game " + activeGame.GameName + " canceled by vote.");
-                league.CancelGame();
+                await textChannel.SendMessage("Game " + ActiveGame.GameName + " canceled by vote.");
+                CancelGame();
             }   
         }
         /// <summary>
-        /// Lists all of the players in the currently activeGame
+        /// Lists all of the players in the currently ActiveGame
         /// </summary>
         /// <param name="textChannel">Channel to broadcast to.</param>
         public async Task listPlayers(Channel textChannel)
         {
-            League league = GetLeagueByChannel(textChannel);
-            Game activeGame = league.GetActiveGame();
-            if (activeGame == null)
+            if (ActiveGame == null)
             {
                 await writeMessage(textChannel, "No games open. Type !hostgame to create a game.");
                 return;
             }
 
-            String message = activeGame.GameName + " (" + activeGame.WaitingList.Count() + "/8) lobby list: \n";
-            foreach (var user in activeGame.WaitingList)
+            String message = ActiveGame.GameName + " (" + ActiveGame.WaitingList.Count() + "/8) lobby list: \n";
+            foreach (var user in ActiveGame.WaitingList)
             {
                 message += user.ToString() + " ";
             }
@@ -297,7 +288,7 @@ namespace BanjoBot
         {
             if (!player.IsIngame())
             {
-                await writeMessage(textChannel, player.Mention + " you are not in a game.");
+                await writeMessage(textChannel, player.User.Mention + " you are not in a game.");
                 return;
             }
 
@@ -306,31 +297,31 @@ namespace BanjoBot
             {
                 if (team == Teams.Blue || team == Teams.Draw)
                 {
-                    await writeMessage(textChannel, player.Mention + " you have already voted for this team.");
+                    await writeMessage(textChannel, player.User.Mention + " you have already voted for this team.");
                 }
                 else if (team == Teams.Red)
                 {
                     game.BlueWinCalls.Remove(player);
                     game.RedWinCalls.Add(player);
-                    await writeMessage(textChannel, player.Mention + " has changed his Mind");
-                    await textChannel.SendMessage("Vote recorded for Red team in game " + game.GameName + " by " + player.Name + ". (" + game.RedWinCalls.Count() + "/5)");
+                    await writeMessage(textChannel, player.User.Mention + " has changed his Mind");
+                    await textChannel.SendMessage("Vote recorded for Red team in game " + game.GameName + " by " + player.User.Name + ". (" + game.RedWinCalls.Count() + "/5)");
                 }
             }
             else if (game.RedWinCalls.Contains(player))
             {
                 if (team == Teams.Red || team == Teams.Draw) {
-                    await writeMessage(textChannel, player.Mention + " you have already voted for this team.");
+                    await writeMessage(textChannel, player.User.Mention + " you have already voted for this team.");
                 }
                 else if (team == Teams.Blue) {
                     game.RedWinCalls.Remove(player);
                     game.BlueWinCalls.Add(player);
-                    await writeMessage(textChannel, player.Mention + " has changed his Mind");
-                    await textChannel.SendMessage("Vote recorded for Blue team in game " + game.GameName + " by " + player.Name + ". (" + game.BlueWinCalls.Count() + "/5)");
+                    await writeMessage(textChannel, player.User.Mention + " has changed his Mind");
+                    await textChannel.SendMessage("Vote recorded for Blue team in game " + game.GameName + " by " + player.User.Name + ". (" + game.BlueWinCalls.Count() + "/5)");
                 }
             }
             else if (game.DrawCalls.Contains(player))
             {
-                await writeMessage(textChannel, player.Mention + " you have already voted");
+                await writeMessage(textChannel, player.User.Mention + " you have already voted");
             }
             else
             {
@@ -338,11 +329,11 @@ namespace BanjoBot
                 {
                     case Teams.Red:
                         game.RedWinCalls.Add(player);
-                        await textChannel.SendMessage("Vote recorded for Red team in game " + game.GameName + " by " + player.Name + ". (" + game.RedWinCalls.Count() + "/5)");
+                        await textChannel.SendMessage("Vote recorded for Red team in game " + game.GameName + " by " + player.User.Name + ". (" + game.RedWinCalls.Count() + "/5)");
                         break;
                     case Teams.Blue:
                         game.BlueWinCalls.Add(player);
-                        await textChannel.SendMessage("Vote recorded for Blue team in game " + game.GameName + " by " + player.Name + ". (" + game.BlueWinCalls.Count() + "/5)");
+                        await textChannel.SendMessage("Vote recorded for Blue team in game " + game.GameName + " by " + player.User.Name + ". (" + game.BlueWinCalls.Count() + "/5)");
                         break;
                     case Teams.Draw:
                         break;
@@ -367,17 +358,15 @@ namespace BanjoBot
         /// <param name="textChannel">Channel to send the message to.</param>
         public async Task getGames(Channel textChannel)
         {
-            League league = GetLeagueByChannel(textChannel);
-            Game activeGame = league.GetActiveGame();
-            if (activeGame != null)
-                await writeMessage(textChannel, "Game in lobby: " + activeGame.GameName + " (" + activeGame.WaitingList.Count() + "/8)");
+            if (ActiveGame != null)
+                await writeMessage(textChannel, "Game in lobby: " + ActiveGame.GameName + " (" + ActiveGame.WaitingList.Count() + "/8)");
             else
                 await writeMessage(textChannel, "No games in lobby.");
 
-            if (league.GetRunningGames().Count > 0)
+            if (RunningGames.Count > 0)
             {
                 String message = "Games in progress: ";
-                foreach (var game in league.GetRunningGames())
+                foreach (var game in RunningGames)
                 {
                     message += game.GameName + " ";
                 }
@@ -392,21 +381,17 @@ namespace BanjoBot
         /// </summary>
         /// <param name="textChannel">Channel to send message to.</param>
         /// <param name="user">Users whos stats will be displayed.</param>
-        public async Task getStats(Channel textChannel, DataStore ds, String playerName)
+        public async Task getStats(Channel textChannel, DataStore ds, Player player)
         {
-            ulong playerID = Convert.ToUInt64( playerName.Trim(new char[] { '<', '@', '!', '>' }) );
-
-            Player user = ds.getPlayer(playerID);
-            if (user != null)
+            if (player != null)
             {
-                int wins = user.Wins;
-                int losses = user.Losses;
+                int wins = player.GetWins(League.LeagueID);
+                int losses = player.GetLosses(League.LeagueID);
                 int gamesPlayed = wins + losses;
-                float winRate = wins/gamesPlayed;
-                await writeMessage(textChannel, user.ToString() + " has " + gamesPlayed + " games played, " + wins + " wins, " + losses + " losses.\nWinrate: " + winRate.ToString("p") + " \nCurrent win streak: " + user.Streak + ".");
+                await writeMessage(textChannel, player.PlayerMMRString(League.LeagueID) + " has " + gamesPlayed + " games played, " + wins + " wins, " + losses + " losses.\nCurrent win streak: " + player.GetStreak(League.LeagueID) + ".");
             }
             else
-                await writeMessage(textChannel, playerName + " has no recorded stats.");
+                await writeMessage(textChannel, player.User.Name + " has no recorded stats.");
         }
 
         /// <summary>
@@ -417,7 +402,7 @@ namespace BanjoBot
         public async Task getTopMMR(Channel textChannel, DataStore ds)
         {
             // Sort dictionary by MMR
-            var sortedDict = from entry in ds.users orderby entry.Value.Mmr descending select entry;
+            var sortedDict = from entry in ds.users orderby entry.Value.GetMMR(League.LeagueID) descending select entry;
 
             await writeMessage(textChannel, "Top 5 players by MMR:");
             string message = "";
@@ -440,7 +425,7 @@ namespace BanjoBot
         public async Task getTopGames(Channel textChannel, DataStore ds)
         {
             // TODO: Sort dictionary by Games played
-            var sortedDict = from entry in ds.users orderby entry.Value.Mmr descending select entry;            // TODO: Add games played count to users, sort by games played.
+            var sortedDict = from entry in ds.users orderby entry.Value.GetMMR(League.LeagueID) descending select entry;            // TODO: Add games played count to users, sort by games played.
 
             await writeMessage(textChannel, "Top 5 players by games played:");
             string message = "";
@@ -453,20 +438,6 @@ namespace BanjoBot
                 i++;
             }
             await writeMessage(textChannel, message);
-        }
-
-        /// <summary>
-        /// Saves the current gameCounter and User data.
-        /// </summary>
-        /// <param name="textChannel"></param>
-        public void saveData(ulong id)
-        {
-            // If caller is author or admin
-            if (id == 118233869093699588 || id == 118288095790628871)
-            {
-                DataStore.GetInstance().writeXML();
-                Console.Out.WriteLine("Data saved.");
-            }
         }
 
         /// <summary>
@@ -484,8 +455,7 @@ namespace BanjoBot
         /// <param name="textChannel">Text channel to broadcast to.</param>
         /// <param name="gameName">Name of the game to end.</param>
         public async void EndGame(Game game, Teams team, Channel textChannel) {
-            League league = GetLeagueByChannel(textChannel);
-            league.CloseGame(game,team);
+            CloseGame(game,team);
             await textChannel.SendMessage("Closing game " + game.GameName);
             printGameResult(game, team, textChannel);
         }
@@ -521,18 +491,18 @@ namespace BanjoBot
             String message = "";
             message += "Blue team (" + blueSign + game.MmrAdjustment + "): ";
             foreach (var player in game.BlueList) {
-                if (player.Streak > 1)
-                    message += player.ToString() + "+" + 2 * (player.Streak - 1) + " ";
+                if (player.GetStreak(League.LeagueID) > 1)
+                    message += player.PlayerMMRString(League.LeagueID) + "+" + 2 * (player.GetStreak(League.LeagueID) - 1) + " ";
                 else
-                    message += player.ToString() + " ";
+                    message += player.PlayerMMRString(League.LeagueID) + " ";
             }
             message += "\n";
             message += "Red team ("+ redSign + game.MmrAdjustment + "): ";
             foreach (var player in game.RedList) {
-                if (player.Streak > 1)
-                    message += player.ToString() + "+" + 2 * (player.Streak - 1) + " ";
+                if (player.GetStreak(League.LeagueID) > 1)
+                    message += player.PlayerMMRString(League.LeagueID) + "+" + 2 * (player.GetStreak(League.LeagueID) - 1) + " ";
                 else
-                    message += player.ToString() + " ";
+                    message += player.PlayerMMRString(League.LeagueID) + " ";
             }
 
             return message;
