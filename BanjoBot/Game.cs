@@ -12,7 +12,7 @@ namespace BanjoBot
     /// </summary>
     public enum Teams { Red, Blue, Draw };
 
-    class Game
+    public class Game
     {
         // Constants
         public const int MAXPLAYERS    = 8;

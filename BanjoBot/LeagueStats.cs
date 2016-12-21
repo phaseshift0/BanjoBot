@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BanjoBot {
-    class LeagueStats {
+    public class LeagueStats {
         public int LeagueID { get; set; }
         public int Season { get; set; }
         public int Matches { get; set; }

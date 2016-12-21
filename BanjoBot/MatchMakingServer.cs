@@ -4,27 +4,91 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Discord;
+using Discord.API;
+using Discord.WebSocket;
 
 namespace BanjoBot {
-    class MatchMakingServer
+    public class MatchMakingServer
     {
-        public Server DiscordServer { get; set; }
+        //TODO: Moderator Admin role as list
+        //TODO: Change RegisteredPlayers here and in League to Set
+        //TODO: RegisteredPlayer setter: update RegisteredPlayers
+        public SocketGuild DiscordServer { get; set; }
         public List<LeagueController> LeagueController { get; set; }
-        public List<League> Leagues { get; set; }
+        public List<Player> RegisteredPlayers { get; set; }
+        public SocketRole ModeratorRoles { get; set; } //TODO:
 
-        public MatchMakingServer(Server discordServer)
-        {
-            
-        }
-
-        public MatchMakingServer(Server discordServer, List<League> leagues)
+        public MatchMakingServer(SocketGuild discordServer, League league)
         {
             DiscordServer = discordServer;
-            Leagues = leagues;
-            foreach (League league in Leagues)
+            LeagueController = new List<LeagueController>();
+            LeagueController.Add(new LeagueController(this, league));
+        }
+
+        public MatchMakingServer(SocketGuild discordServer, List<League> leagues)
+        {
+            DiscordServer = discordServer;
+            LeagueController = new List<LeagueController>();
+            RegisteredPlayers = new List<Player>();
+            foreach (League league in leagues)
             {
                 LeagueController.Add(new LeagueController(this,league));
             }
+        }
+
+        public void AddLeague(League league)
+        {
+            LeagueController.Add(new LeagueController(this,league));
+        }
+
+        public LeagueController GetLeagueController(SocketGuildChannel channel)
+        {
+            // Global League
+            if (LeagueController.Count == 1 && LeagueController.First().League.Channel == null)
+            {
+                return LeagueController.First();
+            }
+
+            // Get League by Channel
+            foreach (LeagueController leagueController in LeagueController)
+            {
+                if (leagueController.League.Channel == channel)
+                {
+                    return leagueController;
+                }
+            }
+
+            return null;
+        }
+
+        public bool IsGlobal()
+        {
+            if (LeagueController.Count == 1 && LeagueController.First().League.Channel == null)
+                return true;
+            else
+                return false;
+
+        }
+
+        public bool IsLeagueChannel(SocketGuildChannel channel)
+        {
+            foreach (LeagueController leagueController in LeagueController) {
+                if (leagueController.League.Channel == channel) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public Player GetPlayer(ulong userID) {
+
+            foreach (var player in RegisteredPlayers) {
+                if (player.User.Id == userID) {
+                    return player;
+                }
+            }
+            return null;
         }
     }
 }

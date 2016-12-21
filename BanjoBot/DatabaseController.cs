@@ -1,21 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
-using System.Text;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using Discord;
+using Discord.Commands;
+using Discord.WebSocket;
 using MySql.Data.MySqlClient;
 
 namespace BanjoBot {
-    class DatabaseController {
-        private MySql.Data.MySqlClient.MySqlConnection _connection;
+    public class DatabaseController {
+        private MySqlConnection _connection;
+        private IDependencyMap map;
 
-        public DatabaseController()
+        public DatabaseController(IDependencyMap map)
         {
             string myConnectionString = "server=127.0.0.1;uid=banjo_admin;" + "pwd=D2bblXX!;database=banjoball;";
-            _connection = new MySql.Data.MySqlClient.MySqlConnection();
+            _connection = new MySqlConnection();
             _connection.ConnectionString = myConnectionString;
+            this.map = map;
         }
 
         public void InsertMatch(Game game)
@@ -36,6 +35,62 @@ namespace BanjoBot {
         public void UpdateLeague() 
         {
 
+        }
+
+        public async Task InsertNewPlayer()
+        {
+            //MySqlCommand command = _connection.CreateCommand();
+            //command.CommandText = "Insert into players (discord_server_id, steamID) Values (@serverID,1)";
+            //command.Parameters.AddWithValue("@serverID", discordServerID);
+            //_connection.Open();
+            //int leagueID = (int)command.ExecuteScalar();
+            //_connection.Close();
+            //return leagueID;
+        }
+
+        public  async Task<MatchMakingServer> GetServer(SocketGuild discordServer) {
+            //TODO: Get GameCount for current season from sql
+            MySqlCommand command = _connection.CreateCommand();
+            command.CommandText = "select * from leagues where discord_server_id=@id";
+            command.Parameters.AddWithValue("@id",discordServer.Id);
+             _connection.Open();
+            MySqlDataReader reader = command.ExecuteReader();
+
+            List<League> leagues = new List<League>();
+            while (reader.Read())
+            {
+                int leagueID = 0;
+                SocketGuildChannel channel = null;
+                SocketRole role = null;
+                int season = 0;
+
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    if (reader.GetName(i).Equals("league_id")) {
+                        leagueID = reader.GetInt32(i);
+                    }
+                    else if (!reader.IsDBNull(i) && reader.GetName(i).Equals("channel_id")) {
+                        channel = discordServer.GetChannel(reader.GetUInt64(i));
+                    }
+                    else if (!reader.IsDBNull(i) && reader.GetName(i).Equals("role_id")) {
+                        role = discordServer.GetRole(reader.GetUInt64(i));
+                    }
+                    else if (reader.GetName(i).Equals("season")) {
+                        season = reader.GetInt32(i);
+                    }
+                }
+                leagues.Add(new League(leagueID, season, channel, role));
+            }
+
+            _connection.Close();
+            if (leagues.Count > 0)
+            {
+                return new MatchMakingServer(discordServer, leagues);
+            }
+
+            return null;
+
+            
         }
 
         public int InsertNewLeague(ulong discordServerID)
@@ -83,7 +138,9 @@ namespace BanjoBot {
                 int losses = 0;
                 int mmr = 0;
                 int leagueId = 0;
-                for (int i = 0; i < reader.FieldCount; i++) {
+
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
                     if (reader.GetName(i).Equals("discord_id"))
                     {
                         discordId = reader.GetUInt64(i);
@@ -92,14 +149,16 @@ namespace BanjoBot {
                     {
                         steamId = reader.GetUInt64(i);
                     }
-                    else if (reader.GetName(i).Equals("season")) {
+                    else if (reader.GetName(i).Equals("season"))
+                    {
                         season = reader.GetInt32(i);
                     }
                     else if (reader.GetName(i).Equals("streak"))
                     {
                         streak = reader.GetInt32(i);
                     }
-                    else if (reader.GetName(i).Equals("matches")) {
+                    else if (reader.GetName(i).Equals("matches"))
+                    {
                         matches = reader.GetInt32(i);
                     }
                     else if (reader.GetName(i).Equals("wins"))
@@ -114,15 +173,33 @@ namespace BanjoBot {
                     {
                         mmr = reader.GetInt32(i);
                     }
-                    else if (reader.GetName(i).Equals("league_id")) {
+                    else if (reader.GetName(i).Equals("league_id"))
+                    {
                         leagueId = reader.GetInt32(i);
                     }
                 }
-                User discordUser = server.DiscordServer.GetUser(discordId);
-                Player player = new Player(discordUser,steamId);
-                player.LeagueStats.Add(new LeagueStats(leagueId,season,matches,wins,losses, mmr, streak));
-                result.Add(player);
-            }
+                SocketGuildUser discordUser = server.DiscordServer.GetUser(discordId);
+                if (discordUser != null)
+                {
+                    Player existingPlayer = null;
+                    foreach (var p in result)
+                    {
+                        if (p.User == discordUser)
+                        {
+                            existingPlayer = p;
+                            existingPlayer.LeagueStats.Add(new LeagueStats(leagueId, season, matches, wins, losses, mmr, streak));
+                            break;
+                        }
+                    }
+                    if (existingPlayer == null)
+                    {
+                        Player player = new Player(discordUser, steamId);
+                        player.LeagueStats.Add(new LeagueStats(leagueId, season, matches, wins, losses, mmr, streak));
+                        result.Add(player);
+                    }                
+                }
+                
+        }
             _connection.Close();
 
             return result;

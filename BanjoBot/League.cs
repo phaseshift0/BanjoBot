@@ -1,89 +1,40 @@
-﻿using Discord;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
+using Discord;
+using Discord.API;
+using Discord.WebSocket;
 
 namespace BanjoBot {
-    class League {
-        private List<Player> _allPlayers;
-        private Game _activeGame;
-        private List<Game> _runningGames;
-        public Channel Channel { get; set; }
-        public Role Role { get; set; }
-        public String Name { get; set; }
+    public class League {
+        //TODO: ActiveGame and RunningGames to LC
+        public int LeagueID { get; set; }
+        public string Name { get; set; } //TODO:
+        public List<Player> RegisteredPlayers { get; set; }
+        public List<ulong> ApplicantsIDs { get; set; } //TODO:
+        public SocketGuildChannel Channel { get; set; }
+        public SocketRole Role { get; set; }
+        public int Season { get; set; }
+        public int GameCounter { get; set; } //TODO:
+        public bool AutoAccept { get; set; } = true; //TODO:
+        public bool NeedSteamToRegister { get; set; } = true; //TODO:
 
-        public League(String name, Channel channel) {
-            _runningGames = new List<Game>();
+        public League(int id, int season, SocketGuildChannel channel, SocketRole role, int gameCounter = 0) {
+            LeagueID = id;
+            Season = season;
             Channel = channel;
-            Name = name;
-        }
-
-        public League(String name, Channel channel, Role role) : this(name, channel)
-        {
             Role = role;
+            GameCounter = gameCounter;
+            RegisteredPlayers = new List<Player>();
+            ApplicantsIDs = new List<ulong>();
         }
 
-        public Game HostGame(Player host)
+        public Player GetPlayerByDiscordID(ulong id)
         {
-            Game game = new Game(host, DataStore.GetInstance().getGameCounter());
-            _activeGame = game;
-
-            return game;
-        }
-
-        public Game GetActiveGame()
-        {
-            return _activeGame;
-        }
-
-        public void CloseGame(Game game, Teams winnerTeam)
-        {
-            game.AdjustStats(winnerTeam);
-            _runningGames.Remove(game);
-            foreach (Player player in game.WaitingList)
+            foreach (Player player in RegisteredPlayers)
             {
-                player.CurrentGame = null;
+                if (player.User.Id == id)
+                    return player;
             }
-
-            saveData();
-        }
-
-        private void saveData()
-        {
-                        //TODO: Saving to different xmls or mysql server
-        }
-
-        public void StartGame()
-        {
-            foreach(Player player in _activeGame.WaitingList)
-            {
-                player.CurrentGame = _activeGame;
-            }
-            _activeGame.StartGame();
-            _runningGames.Add(_activeGame);
-            _activeGame = null;
-        }
-
-        public void CancelGame()
-        {
-            _activeGame = null;
-        }
-
-        public bool LobbyExists()
-        {
-            return _activeGame != null;
-        }
-
-        public int GetAndIncGameCounter()
-        {
-            throw new NotImplementedException();
-        }
-
-        public List<Game> GetRunningGames()
-        {
-            return _runningGames;
+            return null;
         }
     }
 }
