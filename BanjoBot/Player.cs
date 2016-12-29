@@ -35,7 +35,7 @@ namespace BanjoBot
             return User.Username + "(" + GetLeagueStat(leagueID).MMR + ")";
         }
 
-        private LeagueStats GetLeagueStat(int leagueID) {
+        public LeagueStats GetLeagueStat(int leagueID) {
             foreach (var leagueStat in LeagueStats) {
                 if (leagueStat.LeagueID == leagueID)
                     return leagueStat;

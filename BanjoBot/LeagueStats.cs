@@ -24,5 +24,15 @@ namespace BanjoBot {
             MMR = mmr;
             Streak = streak;
         }
+
+        public void ResetToSeason(int season)
+        {
+            Season = season;
+            Matches = 0;
+            Wins = 0;
+            Losses = 0;
+            MMR = 1000;
+            Streak = 0;
+        }
     }
 }

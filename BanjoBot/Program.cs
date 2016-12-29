@@ -19,7 +19,7 @@ namespace BanjoBot
     public class Program
     {
         //TODO: multi channel multi role league 
-        private const String TOKEN = "MjU2NDg3NzU2MDkwNDQxNzI4.CzcTaA.VwuRyn--VPREZUtdr300f5FaQwo";
+        private const String TOKEN = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
         private const String BBL_SIGNUP_URL = "http://www.goo.gl/JbOfGE";
         private const String BASE_SERVER_URL = "http://127.0.0.1/";
         private DiscordSocketClient _bot;
@@ -61,20 +61,20 @@ namespace BanjoBot
             if (matchMakingServer != null)
             {
                 _allServers.Add(matchMakingServer);
-                LoadPlayerBase(matchMakingServer);
+                await LoadPlayerBase(matchMakingServer);
             }
             else
             {
-                matchMakingServer = createNewServer(server);
+                matchMakingServer = await CreateServer(server);
                 _allServers.Add(matchMakingServer);
             }
             Console.WriteLine("Server is ready!");
         }
 
-        private void LoadPlayerBase(MatchMakingServer server)
+        private async Task LoadPlayerBase(MatchMakingServer server)
         {
             Console.WriteLine("Load Playerbase...");
-            List<Player> allPlayers = _databaseController.GetPlayerBase(server);
+            List<Player> allPlayers = await _databaseController.GetPlayerBase(server);
             foreach (var player in allPlayers)
             {
                 server.RegisteredPlayers.Add(player);
@@ -91,15 +91,10 @@ namespace BanjoBot
             }
         }
 
-        private MatchMakingServer createNewServer(SocketGuild server)
+        private async Task<MatchMakingServer> CreateServer(SocketGuild server)
         {
-            int leagueID = _databaseController.InsertNewLeague(server.Id);
+            int leagueID = await _databaseController.InsertNewLeague(server.Id);
             return new MatchMakingServer(server, new League(leagueID, 1, null, null));
-        }
-
-        private static void UserRegistration()
-        {
-            
         }
 
         private async Task ServerConnected(SocketGuild server)

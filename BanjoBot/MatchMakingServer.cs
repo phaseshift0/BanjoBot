@@ -12,11 +12,9 @@ namespace BanjoBot {
     {
         //TODO: Moderator Admin role as list
         //TODO: Change RegisteredPlayers here and in League to Set
-        //TODO: RegisteredPlayer setter: update RegisteredPlayers
         public SocketGuild DiscordServer { get; set; }
         public List<LeagueController> LeagueController { get; set; }
         public List<Player> RegisteredPlayers { get; set; }
-        public SocketRole ModeratorRoles { get; set; } //TODO:
 
         public MatchMakingServer(SocketGuild discordServer, League league)
         {
@@ -39,6 +37,10 @@ namespace BanjoBot {
         public void AddLeague(League league)
         {
             LeagueController.Add(new LeagueController(this,league));
+        }
+
+        public void DeleteLeague(LeagueController league) {
+            LeagueController.Remove(league);
         }
 
         public LeagueController GetLeagueController(SocketGuildChannel channel)
