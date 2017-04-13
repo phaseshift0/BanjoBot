@@ -1,35 +1,42 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-using Newtonsoft.Json.Linq;
-using RestSharp;
-using RestSharp.Extensions.MonoHttp;
+using log4net;
+using log4net.Config;
+
+[assembly: log4net.Config.XmlConfigurator(Watch = true)]
 
 namespace BanjoBot
 {
     public class Program
     {
-        //TODO: multi channel multi role league 
-        private const String TOKEN = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-        private const String BBL_SIGNUP_URL = "http://www.goo.gl/JbOfGE";
-        private const String BASE_SERVER_URL = "http://127.0.0.1/";
+        //TODO: Crash recovery http://stackoverflow.com/questions/5302585/crash-recovery-in-application
+        //TODO: cant connect, retry
+        private static readonly ILog log = LogManager.GetLogger(typeof(Program));
+        private const String TOKEN = "MjU2NDg3NzU2MDkwNDQxNzI4.C68v9w.NXmHPLPAFv8Trf5Zd3M3h9gheuM";
         private DiscordSocketClient _bot;
         private List<SocketGuild> _connectedServers;
-        private List<MatchMakingServer> _allServers;
+        private List<LeagueServer> _allServers;
         private DatabaseController _databaseController;
         private CommandService _commands;
         private DependencyMap _commandMap;
+        private SocketServer _socketServer;
 
-        public static void Main(string[] args) => new Program().Run().GetAwaiter().GetResult();
+        [STAThread]
+        public static void Main(string[] args)
+        {
+            //BasicConfigurator.Configure();
+            //XmlConfigurator.Configure(new System.IO.FileInfo(args[0]));
+            //log4net.Config.XmlConfigurator.Configure();
+            // Handler for unhandled exceptions.
+            AppDomain.CurrentDomain.UnhandledException += GlobalUnhandledExceptionHandler;
+
+            new Program().Run().GetAwaiter().GetResult();
+        }
 
         public async Task Run() 
         {
@@ -38,8 +45,9 @@ namespace BanjoBot
             _bot.GuildUnavailable += ServerDisconnected;
             _bot.MessageReceived += BotOnMessageReceived;
             _connectedServers = new List<SocketGuild>();
-            _allServers = new List<MatchMakingServer>();
-            _databaseController = new DatabaseController(new DependencyMap());
+            _allServers = new List<LeagueServer>();
+            _databaseController = new DatabaseController();
+            
 
             // Initialise commands
             Console.WriteLine("Initialising commands...");
@@ -47,21 +55,24 @@ namespace BanjoBot
             commandConfig.CaseSensitiveCommands = false;
             _commands = new CommandService();
             _commandMap = new DependencyMap();
-            await InitialiseCommands(); 
+            await InitialiseCommands();
 
             await _bot.LoginAsync(TokenType.Bot, TOKEN);
             await _bot.ConnectAsync();
             await Task.Delay(-1);
         }
 
+    
+
         private async Task LoadServerInformation(SocketGuild server)
         {
             Console.WriteLine("Downloading server information...");        
-            MatchMakingServer matchMakingServer = await _databaseController.GetServer(server);
+            LeagueServer matchMakingServer = await _databaseController.GetServer(server);
             if (matchMakingServer != null)
             {
                 _allServers.Add(matchMakingServer);
                 await LoadPlayerBase(matchMakingServer);
+                await LoadMatchHistory(matchMakingServer);
             }
             else
             {
@@ -69,18 +80,19 @@ namespace BanjoBot
                 _allServers.Add(matchMakingServer);
             }
             Console.WriteLine("Server is ready!");
+            _socketServer = new SocketServer(_allServers);
         }
 
-        private async Task LoadPlayerBase(MatchMakingServer server)
+        private async Task LoadPlayerBase(LeagueServer server)
         {
-            Console.WriteLine("Load Playerbase...");
+            Console.Write("Load Playerbase...");
             List<Player> allPlayers = await _databaseController.GetPlayerBase(server);
             foreach (var player in allPlayers)
             {
                 server.RegisteredPlayers.Add(player);
                 foreach (var leagueController in server.LeagueController)
                 {
-                    foreach (var playerLeagueStat in player.LeagueStats)
+                    foreach (var playerLeagueStat in player.PlayerStats)
                     {
                         if (playerLeagueStat.LeagueID == leagueController.League.LeagueID)
                         {
@@ -89,12 +101,72 @@ namespace BanjoBot
                     }
                 }
             }
+            Console.WriteLine("done!");
+            Console.Write("Load Applicants...");
+            foreach (var lc in server.LeagueController)
+            {
+                lc.League.Applicants = await _databaseController.GetApplicants(server, lc.League);
+            }
+            Console.WriteLine("done!");
         }
 
-        private async Task<MatchMakingServer> CreateServer(SocketGuild server)
+        private async Task LoadMatchHistory(LeagueServer server) {
+            Console.Write("Load match history...");
+            foreach (var lc in server.LeagueController)
+            {
+                List<MatchResult> matches = await _databaseController.GetMatchHistory(lc.League.LeagueID);
+                lc.League.Matches = matches;
+                foreach (var matchResult in matches)
+                {
+                    Lobby lobby = null;
+                    if (matchResult.Winner == Teams.None)
+                    {
+                        // Restore Lobby
+                        lobby = new Lobby(lc.League);
+                        lobby.MatchID = matchResult.MatchID;
+                        lobby.League = lc.League;
+                        lobby.GameNumber = lc.League.GameCounter; //TODO: Can be wrong, persistent lobby when
+                        lobby.HasStarted = true;
+                        lc.RunningGames.Add(lobby);
+                    }
+                    
+                    foreach (var stats in matchResult.PlayerMatchStats)
+                    {
+                        if (lobby != null)
+                        {
+                            // Restore Lobby
+                            Player player = server.GetPlayer(stats.DiscordID);
+                            lobby.Host = player;
+                            player.CurrentGame = lobby;
+                            lobby.WaitingList.Add(player);
+                            if (stats.Team == Teams.Blue)
+                            {
+                                lobby.BlueList.Add(player);
+                            }
+                            else
+                            {
+                                lobby.RedList.Add(player);
+                            }
+                        }
+
+                        Player p = server.GetPlayer(stats.DiscordID);
+                        if(p != null)
+                            p.Matches.Add(stats);
+                    }
+
+                    if (lobby != null)
+                    {
+                        // Restore Lobby
+                        lobby.MmrAdjustment = lobby.CalculateMmrAdjustment();
+                    }
+                }
+            }
+            Console.WriteLine("done!");
+        }
+
+        private async Task<LeagueServer> CreateServer(SocketGuild server)
         {
-            int leagueID = await _databaseController.InsertNewLeague(server.Id);
-            return new MatchMakingServer(server, new League(leagueID, 1, null, null));
+            return new LeagueServer(server);
         }
 
         private async Task ServerConnected(SocketGuild server)
@@ -116,8 +188,7 @@ namespace BanjoBot
         }
 
         private bool IsServerInitialised(SocketGuild server) {
-            //TODO: Wait for initialising players
-            foreach (MatchMakingServer myServer in _allServers) {
+            foreach (LeagueServer myServer in _allServers) {
                 if (myServer.DiscordServer.Id == server.Id)
                     return true;
             }
@@ -134,18 +205,24 @@ namespace BanjoBot
 
         }
 
+        private async Task OnNewMember(SocketMessage socketMessage) {
+            foreach (var socketMessageMentionedUser in socketMessage.MentionedUsers) {
+                if (socketMessageMentionedUser.Id == _bot.CurrentUser.Id)
+                    await socketMessage.Channel.SendMessageAsync("Fuck you");
+            }
+
+        }
+
         /// <summary>
         /// Creates the commands.
         /// </summary>
         private async Task InitialiseCommands()
         {
-            // TODO: AddCheck to all commands (if Server is not in _AllServers)
-            // TODO: CheckIFRegistered should check if users is registered for the _correct_ server
-            // TODO: CheckIFLeagueChannel check league channel for the _correct_ server
-            //_commandMap.Add(_allServers);
             _commandMap.Add(_bot);
             _commandMap.Add(_allServers);
             _commandMap.Add(_databaseController);
+            _commandMap.Add(_commands);
+        
             _bot.MessageReceived += HandleCommand;
             await _commands.AddModulesAsync(Assembly.GetEntryAssembly());
         }
@@ -166,6 +243,13 @@ namespace BanjoBot
             var result = await _commands.ExecuteAsync(context, argPos, _commandMap);
             if (!result.IsSuccess)
                 await message.Channel.SendMessageAsync(result.ErrorReason);
+        }
+
+        private static void GlobalUnhandledExceptionHandler(object sender, UnhandledExceptionEventArgs e) {
+            Exception ex = default(Exception);
+            ex = (Exception)e.ExceptionObject;
+            log.Error(ex.Message + "\n" + ex.StackTrace);
+            Console.WriteLine("Fatal Error" + ex.Message + "\n Stacktrace:\n" + ex.StackTrace);
         }
     }
 }

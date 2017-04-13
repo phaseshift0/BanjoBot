@@ -8,22 +8,20 @@ using Discord.API;
 using Discord.WebSocket;
 
 namespace BanjoBot {
-    public class MatchMakingServer
+    public class LeagueServer
     {
-        //TODO: Moderator Admin role as list
-        //TODO: Change RegisteredPlayers here and in League to Set
         public SocketGuild DiscordServer { get; set; }
         public List<LeagueController> LeagueController { get; set; }
         public List<Player> RegisteredPlayers { get; set; }
+        public SocketGuildChannel ModeratorChannel { get; set; } //TODO
 
-        public MatchMakingServer(SocketGuild discordServer, League league)
+        public LeagueServer(SocketGuild discordServer)
         {
             DiscordServer = discordServer;
             LeagueController = new List<LeagueController>();
-            LeagueController.Add(new LeagueController(this, league));
         }
 
-        public MatchMakingServer(SocketGuild discordServer, List<League> leagues)
+        public LeagueServer(SocketGuild discordServer, List<League> leagues)
         {
             DiscordServer = discordServer;
             LeagueController = new List<LeagueController>();
@@ -56,6 +54,22 @@ namespace BanjoBot {
             {
                 if (leagueController.League.Channel == channel)
                 {
+                    return leagueController;
+                }
+            }
+
+            return null;
+        }
+
+        public LeagueController GetLeagueController(int LeagueID) {
+            // Global League
+            if (LeagueController.Count == 1 && LeagueController.First().League.Channel == null) {
+                return LeagueController.First();
+            }
+
+            // Get League by Channel
+            foreach (LeagueController leagueController in LeagueController) {
+                if (leagueController.League.LeagueID == LeagueID) {
                     return leagueController;
                 }
             }

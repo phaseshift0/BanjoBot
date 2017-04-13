@@ -10,19 +10,19 @@ using Discord.WebSocket;
 namespace BanjoBot
 {
     public class Player : IEquatable<Player> {
-
-        // TODO: remove getter setter and replace with GetLeagueStats(Leagueid)
         public SocketGuildUser User { get; set; }
         public ulong SteamID { get; set; }
-        public Game CurrentGame   { get; set; }
-        public List<LeagueStats> LeagueStats { get; set; }
+        public Lobby CurrentGame   { get; set; }
+        public List<PlayerStats> PlayerStats { get; set; }
+        public List<PlayerMatchStats> Matches { get; set; }
 
         public Player(SocketGuildUser discordUser, ulong steamid)
         {
             User = discordUser;
             SteamID = steamid;
             CurrentGame = null;
-            LeagueStats = new List<LeagueStats>();
+            PlayerStats = new List<PlayerStats>();
+            Matches = new List<PlayerMatchStats>();
         }
 
         public bool Equals(Player other)
@@ -30,76 +30,89 @@ namespace BanjoBot
             return User.Id == other.User.Id;
         }
 
-        public string PlayerMMRString(int leagueID)
+        public string PlayerMMRString(int leagueID, int season)
         {
-            return User.Username + "(" + GetLeagueStat(leagueID).MMR + ")";
+            return User.Username + "(" + GetLeagueStat(leagueID, season).MMR + ")";
         }
 
-        public LeagueStats GetLeagueStat(int leagueID) {
-            foreach (var leagueStat in LeagueStats) {
-                if (leagueStat.LeagueID == leagueID)
+        public PlayerStats GetLeagueStat(int leagueID, int season) {
+            foreach (var leagueStat in PlayerStats) {
+                if (leagueStat.LeagueID == leagueID && leagueStat.Season == season)
                     return leagueStat;
             }
             return null;
         }
 
-        public int GetMMR(int leagueID)
+        public List<PlayerMatchStats> GetMatchesBySeason(int leagueID, int season)
         {
-            return GetLeagueStat(leagueID).MMR;
-        }
-
-        public int GetWins(int leagueID) 
+            List<PlayerMatchStats> result = new List<PlayerMatchStats>();
+            foreach (PlayerMatchStats ps in Matches)
             {
-            return GetLeagueStat(leagueID).Wins;
+                if (ps.Match.LeagueID == leagueID && ps.Match.Season == season)
+                {
+                    result.Add(ps);
+                }
+            }
+
+            return result;
         }
 
-        public int GetLosses(int leagueID) 
+        public List<PlayerMatchStats> GetAllMatches(int leagueID) {
+            List<PlayerMatchStats> result = new List<PlayerMatchStats>();
+            foreach (PlayerMatchStats ps in Matches) {
+                if (ps.Match.LeagueID == leagueID) {
+                    result.Add(ps);
+                }
+            }
+
+            return result;
+        }
+
+        public PlayerMatchStats GetMatchStats(MatchResult match)
+        {
+            foreach (var stats in Matches)
             {
-            return GetLeagueStat(leagueID).Losses;
+                if (stats.Match == match)
+                {
+                    return stats;
+                }
+            }
+
+            return null;
         }
 
-        public int GetStreak(int leagueID) 
-            {
-            return GetLeagueStat(leagueID).Streak;
-        }
-
-        public int GetMatches(int leagueID)
+        public void IncMatches(int leagueID, int season)
         {
-            return GetLeagueStat(leagueID).Matches;
+            GetLeagueStat(leagueID, season).MatchCount++;
         }
 
-        public void IncMatches(int leagueID)
+        public void IncMMR(int leagueID, int season, int mmr) {
+            GetLeagueStat(leagueID, season).MMR += mmr;
+        }
+
+        public void SetMMR(int leagueID, int season, int mmr) {
+            GetLeagueStat(leagueID, season).MMR = mmr;
+        }
+
+        public void DecMMR(int leagueID, int season, int mmr) {
+            GetLeagueStat(leagueID, season).MMR -= mmr;
+        }
+
+        public void IncWins(int leagueID, int season)
         {
-            GetLeagueStat(leagueID).Matches++;
+            GetLeagueStat(leagueID, season).Wins++;
         }
 
-        public void IncMMR(int leagueID, int mmr) {
-            GetLeagueStat(leagueID).MMR += mmr;
-        }
-
-        public void SetMMR(int leagueID, int mmr) {
-            GetLeagueStat(leagueID).MMR = mmr;
-        }
-
-        public void DecMMR(int leagueID, int mmr) {
-            GetLeagueStat(leagueID).MMR -= mmr;
-        }
-
-        public void IncWins(int leagueID)
+        public void IncLosses(int leagueID, int season)
         {
-            GetLeagueStat(leagueID).Wins++;
+            GetLeagueStat(leagueID, season).Losses++;
         }
-
-        public void IncLosses(int leagueID)
+        public void IncStreak(int leagueID, int season)
         {
-            GetLeagueStat(leagueID).Losses++;
+            GetLeagueStat(leagueID, season).Streak++;
         }
-        public void IncStreak(int leagueID)
-        {
-            GetLeagueStat(leagueID).Streak++;
-        }
-        public void SetStreakZero(int leagueID) {
-            GetLeagueStat(leagueID).Streak = 0;
+        public void SetStreakZero(int leagueID, int season) {
+            GetLeagueStat(leagueID, season).Streak = 0;
         }
         public bool IsIngame()
         {
