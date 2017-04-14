@@ -55,11 +55,11 @@ namespace BanjoBot {
                 if ((game.BlueList.Contains(player) && game.Winner == Teams.Blue) ||
                     (game.RedList.Contains(player) && game.Winner == Teams.Red))
                 {
-                    stats = new PlayerMatchStats(this, player.User.Id, player.SteamID, game.MmrAdjustment, (2*player.GetLeagueStat(LeagueID, Season).Streak), Winner, true);
+                    stats = new PlayerMatchStats(this, player.SteamID, game.MmrAdjustment, (2*player.GetLeagueStat(LeagueID, Season).Streak), Winner, true);
                 }
                 else
                 {
-                    stats = new PlayerMatchStats(this, player.User.Id, player.SteamID, -game.MmrAdjustment, 0, Winner, false);
+                    stats = new PlayerMatchStats(this, player.SteamID, -game.MmrAdjustment, 0, Winner, false);
                 }
                 PlayerMatchStats.Add(stats);
                 player.Matches.Add(stats);

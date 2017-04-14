@@ -235,19 +235,20 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CommandModule.cs" />
-    <Compile Include="DatabaseController.cs" />
-    <Compile Include="LeagueController.cs" />
-    <Compile Include="Lobby.cs" />
-    <Compile Include="League.cs" />
-    <Compile Include="MatchResult.cs" />
-    <Compile Include="SocketServer.cs" />
-    <Compile Include="PlayerMatchStats.cs" />
-    <Compile Include="PlayerStats.cs" />
-    <Compile Include="LeagueServer.cs" />
+    <Compile Include="Controller\CommandModule.cs" />
+    <Compile Include="persistence\DatabaseController.cs" />
+    <Compile Include="model\DiscordInformation.cs" />
+    <Compile Include="Controller\LeagueController.cs" />
+    <Compile Include="model\Lobby.cs" />
+    <Compile Include="model\League.cs" />
+    <Compile Include="model\MatchResult.cs" />
+    <Compile Include="network\SocketServer.cs" />
+    <Compile Include="model\PlayerMatchStats.cs" />
+    <Compile Include="model\PlayerStats.cs" />
+    <Compile Include="Controller\LeagueCoordinator.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Player.cs" />
+    <Compile Include="model\Player.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config">
@@ -273,6 +274,7 @@
       <Install>false</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -18,7 +18,7 @@ namespace BanjoBot
         private static List<Socket> _clientSockets = new List<Socket>();
         private static Socket _serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         private static byte[] _buffer = new byte[1024];
-        private List<LeagueServer> _leagueServers;
+        private LeagueCoordinator _leagueCoordinator;
 
         const string getinfo = @"{ 
                     'AUTH_KEY' : 'a2g9xCvASDh321oc9DVe', 
@@ -85,9 +85,9 @@ namespace BanjoBot
                     }
                 }";
 
-        public SocketServer(List<LeagueServer> servers)
+        public SocketServer(LeagueCoordinator leagueCoordinator)
         {
-            _leagueServers = servers;
+            _leagueCoordinator = leagueCoordinator;
             SetupServer();
 
             //ProcessMessage(getinfo);
@@ -176,21 +176,19 @@ namespace BanjoBot
                 JToken jToken = jObject.GetValue("SteamIDs");
                 ulong[] steamIDs = jToken.Values<ulong>().ToArray();
                 List<Player> players = new List<Player>();
-                foreach (var server in _leagueServers) {
-                    for (int i = 0; i < steamIDs.Length; i++)
+          
+                for (int i = 0; i < steamIDs.Length; i++)
+                {
+                    if (players.Count == 8)
                     {
-                        if (players.Count == 8)
-                        {
-                            break;    
-                        }
-
-                        Player result = server.RegisteredPlayers.Find(x => x.SteamID == steamIDs[i]);
-                        if (result != null)
-                        {
-                            players.Add(result);
-                        }
+                        break;    
                     }
 
+                    Player result = _leagueCoordinator.GetPlayerBySteamID(steamIDs[i]);
+                    if (result != null)
+                    {
+                        players.Add(result);
+                    }
                 }
 
                 if (players.Count < 8)
@@ -284,11 +282,8 @@ namespace BanjoBot
                 Console.WriteLine(json["MatchResult"].ToString());
                 MatchResult match = JsonConvert.DeserializeObject<MatchResult>(json["MatchResult"].ToString());
                 LeagueController lc = null;
-                foreach (var leagueServer in _leagueServers)
-                {
-                    lc = leagueServer.GetLeagueController(match.LeagueID);
-                }
 
+                lc = _leagueCoordinator.GetLeagueController(match.LeagueID);
                 if (lc != null)
                 {
                     Task.Run(async () => {await lc.CloseGameByEvent(match);});

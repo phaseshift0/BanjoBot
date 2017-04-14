@@ -17,10 +17,11 @@ namespace BanjoBot
         //TODO: Crash recovery http://stackoverflow.com/questions/5302585/crash-recovery-in-application
         //TODO: cant connect, retry
         private static readonly ILog log = LogManager.GetLogger(typeof(Program));
-        private const String TOKEN = "MjU2NDg3NzU2MDkwNDQxNzI4.C68v9w.NXmHPLPAFv8Trf5Zd3M3h9gheuM";
+        private const String TOKEN = "MjU1NDQ1NzU4Mjk4NDIzMjk3.C9Jh4w.I4-UxgqN7m_nzN3qYpIGP-IO9WE";
         private DiscordSocketClient _bot;
         private List<SocketGuild> _connectedServers;
-        private List<LeagueServer> _allServers;
+        private List<SocketGuild> _initialisedServers;
+        private LeagueCoordinator _leagueCoordinator;
         private DatabaseController _databaseController;
         private CommandService _commands;
         private DependencyMap _commandMap;
@@ -29,10 +30,6 @@ namespace BanjoBot
         [STAThread]
         public static void Main(string[] args)
         {
-            //BasicConfigurator.Configure();
-            //XmlConfigurator.Configure(new System.IO.FileInfo(args[0]));
-            //log4net.Config.XmlConfigurator.Configure();
-            // Handler for unhandled exceptions.
             AppDomain.CurrentDomain.UnhandledException += GlobalUnhandledExceptionHandler;
 
             new Program().Run().GetAwaiter().GetResult();
@@ -45,9 +42,9 @@ namespace BanjoBot
             _bot.GuildUnavailable += ServerDisconnected;
             _bot.MessageReceived += BotOnMessageReceived;
             _connectedServers = new List<SocketGuild>();
-            _allServers = new List<LeagueServer>();
+            _initialisedServers = new List<SocketGuild>();
+            _leagueCoordinator = LeagueCoordinator.Instance;
             _databaseController = new DatabaseController();
-            
 
             // Initialise commands
             Console.WriteLine("Initialising commands...");
@@ -56,6 +53,10 @@ namespace BanjoBot
             _commands = new CommandService();
             _commandMap = new DependencyMap();
             await InitialiseCommands();
+            await LoadLeagueInformation();
+            await LoadPlayerBase();
+            await LoadMatchHistory();
+            _socketServer = new SocketServer(_leagueCoordinator);
 
             await _bot.LoginAsync(TokenType.Bot, TOKEN);
             await _bot.ConnectAsync();
@@ -64,33 +65,23 @@ namespace BanjoBot
 
     
 
-        private async Task LoadServerInformation(SocketGuild server)
+        private async Task LoadLeagueInformation()
         {
-            Console.WriteLine("Downloading server information...");        
-            LeagueServer matchMakingServer = await _databaseController.GetServer(server);
-            if (matchMakingServer != null)
-            {
-                _allServers.Add(matchMakingServer);
-                await LoadPlayerBase(matchMakingServer);
-                await LoadMatchHistory(matchMakingServer);
-            }
-            else
-            {
-                matchMakingServer = await CreateServer(server);
-                _allServers.Add(matchMakingServer);
-            }
-            Console.WriteLine("Server is ready!");
-            _socketServer = new SocketServer(_allServers);
+     
+            Console.Write("Downloading league information...");
+
+            List<League> leagues = await _databaseController.GetLeagues();
+            _leagueCoordinator.AddLeague(leagues);
+            Console.WriteLine("done!");
         }
 
-        private async Task LoadPlayerBase(LeagueServer server)
+        private async Task LoadPlayerBase()
         {
             Console.Write("Load Playerbase...");
-            List<Player> allPlayers = await _databaseController.GetPlayerBase(server);
+            List<Player> allPlayers = await _databaseController.GetPlayerBase(_leagueCoordinator);
             foreach (var player in allPlayers)
             {
-                server.RegisteredPlayers.Add(player);
-                foreach (var leagueController in server.LeagueController)
+                foreach (var leagueController in _leagueCoordinator.LeagueController)
                 {
                     foreach (var playerLeagueStat in player.PlayerStats)
                     {
@@ -102,17 +93,18 @@ namespace BanjoBot
                 }
             }
             Console.WriteLine("done!");
+
             Console.Write("Load Applicants...");
-            foreach (var lc in server.LeagueController)
+            foreach (var lc in _leagueCoordinator.LeagueController)
             {
-                lc.League.Applicants = await _databaseController.GetApplicants(server, lc.League);
+                lc.League.Applicants = await _databaseController.GetApplicants(_leagueCoordinator, lc.League);
             }
             Console.WriteLine("done!");
         }
 
-        private async Task LoadMatchHistory(LeagueServer server) {
+        private async Task LoadMatchHistory() {
             Console.Write("Load match history...");
-            foreach (var lc in server.LeagueController)
+            foreach (var lc in _leagueCoordinator.LeagueController)
             {
                 List<MatchResult> matches = await _databaseController.GetMatchHistory(lc.League.LeagueID);
                 lc.League.Matches = matches;
@@ -135,7 +127,7 @@ namespace BanjoBot
                         if (lobby != null)
                         {
                             // Restore Lobby
-                            Player player = server.GetPlayer(stats.DiscordID);
+                            Player player = _leagueCoordinator.GetPlayerBySteamID(stats.SteamID);
                             lobby.Host = player;
                             player.CurrentGame = lobby;
                             lobby.WaitingList.Add(player);
@@ -149,7 +141,7 @@ namespace BanjoBot
                             }
                         }
 
-                        Player p = server.GetPlayer(stats.DiscordID);
+                        Player p = _leagueCoordinator.GetPlayerBySteamID(stats.SteamID);
                         if(p != null)
                             p.Matches.Add(stats);
                     }
@@ -164,11 +156,6 @@ namespace BanjoBot
             Console.WriteLine("done!");
         }
 
-        private async Task<LeagueServer> CreateServer(SocketGuild server)
-        {
-            return new LeagueServer(server);
-        }
-
         private async Task ServerConnected(SocketGuild server)
         {
             if (!_connectedServers.Contains(server))
@@ -177,9 +164,35 @@ namespace BanjoBot
                 Console.WriteLine("Bot connected to a new server: " + server.Name + "(" + server.Id + ")");
 
                 if(!IsServerInitialised(server))
-                    await LoadServerInformation(server);    
+                    await UpdateDiscordInformation(server);       
             }
 
+        }
+
+        private async Task UpdateDiscordInformation(SocketGuild server)
+        {
+            Console.Write("Update discord information " + server.Name + "(" + server.Id + ")...");
+            foreach (var lc in _leagueCoordinator.GetLeagueControllersByServer(server))
+            {
+                if (lc.League.DiscordInformation != null)
+                {
+                    if (lc.League.DiscordInformation.DiscordServerId == server.Id)
+                    {
+                        lc.League.DiscordInformation.DiscordServer = server;
+                    }   
+                }
+
+                foreach (var player in lc.League.RegisteredPlayers)
+                {
+                    player.User = server.GetUser(player.discordID);
+                }
+
+                foreach (var player in lc.League.Applicants) {
+                    player.User = server.GetUser(player.discordID);
+                }
+            }
+            _initialisedServers.Add(server);
+            Console.WriteLine("done!");
         }
 
         private async Task ServerDisconnected(SocketGuild socketGuild)
@@ -187,11 +200,10 @@ namespace BanjoBot
             _connectedServers.Remove(socketGuild);
         }
 
-        private bool IsServerInitialised(SocketGuild server) {
-            foreach (LeagueServer myServer in _allServers) {
-                if (myServer.DiscordServer.Id == server.Id)
-                    return true;
-            }
+        private bool IsServerInitialised(SocketGuild server)
+        {
+            if (_initialisedServers.Contains(server))
+                return true;
 
             return false;
         }
@@ -219,7 +231,6 @@ namespace BanjoBot
         private async Task InitialiseCommands()
         {
             _commandMap.Add(_bot);
-            _commandMap.Add(_allServers);
             _commandMap.Add(_databaseController);
             _commandMap.Add(_commands);
         
