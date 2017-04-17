@@ -17,7 +17,7 @@ namespace BanjoBot
         //TODO: Crash recovery http://stackoverflow.com/questions/5302585/crash-recovery-in-application
         //TODO: cant connect, retry
         private static readonly ILog log = LogManager.GetLogger(typeof(Program));
-        private const String TOKEN = "MjU2NDg3NzU2MDkwNDQxNzI4.C68v9w.NXmHPLPAFv8Trf5Zd3M3h9gheuM";
+        private const String TOKEN = "XXXXXXXXXXXXXXXX";
         private DiscordSocketClient _bot;
         private List<SocketGuild> _connectedServers;
         private List<LeagueServer> _allServers;
