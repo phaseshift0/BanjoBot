@@ -264,7 +264,7 @@ namespace BanjoBot
         {
             MySqlCommand command = new MySqlCommand();
             command.CommandText =
-                "Insert into players_leagues (steam_id, league_id, approved) Values (@discordID,@league_id,1) ON DUPLICATE KEY UPDATE approved=1";
+                "Insert into players_leagues (steam_id, league_id, approved) Values (@steam_id,@league_id,1) ON DUPLICATE KEY UPDATE approved=1";
             command.Parameters.AddWithValue("@steam_id", player.SteamID);
             command.Parameters.AddWithValue("@league_id", league.LeagueID);
             await ExecuteNoQuery(command);
