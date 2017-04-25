@@ -122,13 +122,13 @@ namespace BanjoBot {
             }
         }
 
-        [Command("mystats"), Summary("Shows your stats with more detailed information"), Alias(new string[] { "mystats", "ms" }), RequireLeaguePermission]
+        [Command("myprofile"), Summary("Shows your stats with more detailed information"), Alias(new string[] { "mp", "profile"}), RequireLeaguePermission]
         public async Task ShowMyStats() {
             SocketGuildChannel socketGuildChannel = (SocketGuildChannel)Context.Channel;
             LeagueController lc = _leagueCoordinator.GetLeagueController(socketGuildChannel);
             Player player = lc.League.GetPlayerByDiscordID(Context.User.Id);
 
-            await lc.GetFullPlayerStats(player);
+            await lc.ShowPlayerProfile(player);
         }
 
         [Command("getgames"), Summary("Shows the status of all games"), Alias(new string[] { "gg", "games" }), RequireLeagueChannel]
@@ -155,7 +155,7 @@ namespace BanjoBot {
             await lc.VoteWinner(Context.Channel, player, Teams.Red);
         }
 
-        [Command("won"), Summary("Cast vote for Red Team as the winner of your current game (post game only)."), Alias(new string[] { "win" }), RequireLeaguePermission]
+        [Command("won"), Summary("Cast vote for Red Team as the winner of your current game (post game only)."), Alias(new string[] { "win", "ez" }), RequireLeaguePermission]
         public async Task Win() {
             SocketGuildChannel socketGuildChannel = (SocketGuildChannel)Context.Channel;
             LeagueController lc = _leagueCoordinator.GetLeagueController(socketGuildChannel);
@@ -170,7 +170,7 @@ namespace BanjoBot {
             await lc.VoteWinner(Context.Channel, player, team);
         }
 
-        [Command("lost"), Summary("Cast vote for Red Team as the winner of your current game (post game only)."), Alias(new string[] { "loss" }), RequireLeaguePermission]
+        [Command("lost"), Summary("Cast vote for Red Team as the winner of your current game (post game only)."), Alias(new string[] { "loss","lose" }), RequireLeaguePermission]
         public async Task Lost() {
             SocketGuildChannel socketGuildChannel = (SocketGuildChannel)Context.Channel;
             LeagueController lc = _leagueCoordinator.GetLeagueController(socketGuildChannel);
@@ -278,7 +278,8 @@ namespace BanjoBot {
                 }
                 else
                 {
-                    await((ITextChannel) lc.League.DiscordInformation.ModeratorChannel).SendMessageAsync("New applicant: " + player.User.Mention + " League: " + lc.League.Name);
+                    IUserMessage message = await((ITextChannel) lc.League.DiscordInformation.ModeratorChannel).SendMessageAsync("New applicant: " + player.User.Mention + "\t" + STEAM_PROFILE_URL + player.SteamID +"\tLeague: " + lc.League.Name);
+                    await message.PinAsync();
                 }
             }
         }
@@ -314,7 +315,7 @@ namespace BanjoBot {
                 return;
             }
 
-            if (!((lc.League.DiscordInformation.ModeratorRole != null && ((SocketGuildUser)(Context.User)).RoleIds.Contains(lc.League.DiscordInformation.ModeratorRole.Id)) || ((SocketGuildUser)(Context.User)).GuildPermissions.Administrator)) {
+            if (!CheckModeratorPermission((SocketGuildUser)Context.User,lc)) {
                 return;
             }
 
@@ -330,10 +331,10 @@ namespace BanjoBot {
                 return;
             }
 
-            if (!((lc.League.DiscordInformation.ModeratorRole != null && ((SocketGuildUser)(Context.User)).RoleIds.Contains(lc.League.DiscordInformation.ModeratorRole.Id)) || ((SocketGuildUser)(Context.User)).GuildPermissions.Administrator)) {
+            if (!CheckModeratorPermission((SocketGuildUser)Context.User, lc)) {
                 return;
             }
-            
+
             await lc.ReCreateLobby(Context.Channel,match, player);
         }
 
@@ -345,7 +346,7 @@ namespace BanjoBot {
                 return;
             }
 
-            if (!((lc.League.DiscordInformation.ModeratorRole != null && ((SocketGuildUser)(Context.User)).RoleIds.Contains(lc.League.DiscordInformation.ModeratorRole.Id)) || ((SocketGuildUser)(Context.User)).GuildPermissions.Administrator)) {
+            if (!CheckModeratorPermission((SocketGuildUser)Context.User, lc)) {
                 return;
             }
 
@@ -360,7 +361,7 @@ namespace BanjoBot {
         }
 
 
-        //TODO: Fatal error?
+
         [Command("accept"), Summary("Accepts a applicant. !accept <#league-channel> <@player>  (moderator)")]
         public async Task Accept([Summary("@Player")]IGuildUser guildUser, [Summary("#Channel")]IChannel channel = null) {
             SocketGuildChannel socketGuildChannel = null;
@@ -376,8 +377,8 @@ namespace BanjoBot {
                 await ReplyAsync("This is no league channel.");
                 return;
             }
-
-            if (!((lc.League.DiscordInformation.ModeratorRole != null && ((SocketGuildUser)(Context.User)).RoleIds.Contains(lc.League.DiscordInformation.ModeratorRole.Id)) || ((SocketGuildUser)(Context.User)).GuildPermissions.Administrator)) {
+            
+            if (!CheckModeratorPermission((SocketGuildUser)Context.User, lc)) {
                 return;
             }
 
@@ -412,7 +413,7 @@ namespace BanjoBot {
                 return;
             }
 
-            if (!((lc.League.DiscordInformation.ModeratorRole != null && ((SocketGuildUser)(Context.User)).RoleIds.Contains(lc.League.DiscordInformation.ModeratorRole.Id)) || ((SocketGuildUser)(Context.User)).GuildPermissions.Administrator)) {
+            if (!CheckModeratorPermission((SocketGuildUser)Context.User, lc)) {
                 return;
             }
 
@@ -463,7 +464,7 @@ namespace BanjoBot {
                     "Applicants","ModRole"};
             String s = String.Format(
                         "{0,-4} {1,-10} {2,-10} {3,-10} {4,-12} {5,-8} {6,-8} {7,-8} {8,-8} {9,-8} {10,-10}\n", args);
-            foreach (var lc in _leagueCoordinator.LeagueController) {
+            foreach (var lc in _leagueCoordinator.GetLeagueControllersByServer((SocketGuild)Context.Guild)) {
                 string channel = lc.League.DiscordInformation.Channel != null ? lc.League.DiscordInformation.Channel.Name : "none";
                 string role = lc.League.DiscordInformation.LeagueRole != null ? lc.League.DiscordInformation.LeagueRole.Name : "none";
                 string modrole = lc.League.DiscordInformation.ModeratorRole != null ? lc.League.DiscordInformation.ModeratorRole.Name : "none";
@@ -816,7 +817,7 @@ namespace BanjoBot {
                 }
             }
 
-            await context.Channel.SendMessageAsync("You are not registered. Sign up with !register <YourSteamID64> <#league-channel>");
+            await context.Channel.SendMessageAsync("You are not registered. Sign up with !register <YourSteamID64> <#league-channel>. For Instructions see #welcome");
             return PreconditionResult.FromError("You are not registered. Sign up with !register <YourSteamID64> <#league-channel>");
         }
     }

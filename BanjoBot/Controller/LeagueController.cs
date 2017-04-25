@@ -102,6 +102,7 @@ namespace BanjoBot
 
             if (winnerTeam == Teams.Draw) {
                 await _database.DrawMatch(game);
+                await ((ITextChannel)League.DiscordInformation.Channel).SendMessageAsync("Closing lobby\n Game " + game.GetGameName() + " has ended in a draw. No stats have been recorded.");
                 return;
             }
 
@@ -329,6 +330,7 @@ namespace BanjoBot
                 await textChannel.SendMessageAsync(player.PlayerMMRString(League.LeagueID, League.Season) + " has joined the lobby. (" + Lobby.WaitingList.Count() + "/8)");
                 if (Lobby.WaitingList.Count() == 8) { 
                     await textChannel.SendMessageAsync(Lobby.Host.User.Mention + ", The lobby is full. Type !startgame to start the game");
+                    await (await (Lobby.Host.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("The lobby is full. Type !startgame to start the game");
                 }
             }
 
@@ -429,7 +431,7 @@ namespace BanjoBot
             if (Lobby.Host != player) { 
                 await WriteMessage(textChannel, player.User.Mention + " only the host (" + Lobby.Host.User.Username + ") can start the game.");
                 return;
-            }else if (Lobby.WaitingList.Count < 8) { 
+            }else if (Lobby.WaitingList.Count < 1) { 
                 await WriteMessage(textChannel, player.User.Mention + " you need 8 players to start the game.");
                 return;
             }
@@ -454,6 +456,11 @@ namespace BanjoBot
             // Broadcast teams and password
             Lobby.StartMessage = await textChannel.SendMessageAsync(startmessage + "\n" + blueTeam + "\n" + redTeam + "\nPassword: " + Lobby.GeneratePassword(6));
             await Lobby.StartMessage.PinAsync();
+
+            foreach (var p in Lobby.WaitingList)
+            {
+                await (await (p.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync(Lobby.GetGameName() +  "has been started");
+            }
 
             Lobby = null;
             await UpdateChannelWithLobby();
@@ -651,10 +658,11 @@ namespace BanjoBot
                 await WriteMessage(textChannel, player.User.Username + " has no recorded stats.");
         }
 
-        public async Task GetFullPlayerStats(Player  player, int season)
+        public async Task ShowPlayerProfile(Player  player, int season)
         {
-            object[] args = new object[] { "Goals", "Assist", "Steals", "Turnovers", "S/T", "Pickups", "Passes", "PR", "Save", "Points", "PosT", "TAG"};
-            String s = String.Format("{0,-10} {1,-10} {2,-10} {3,-10} {4,-10} {5,-10} {6,-10} {7,-10} {8,-10} {9,-10} {10,-10} {11,-10}\n", args);
+            EmbedBuilder builder = new EmbedBuilder();
+            builder.WithColor(new Color(0, 0, 255));
+            builder.Title = player.User.Username + "'s profile";
             float goals = 0;
             float assist = 0;
             float steals = 0;
@@ -669,11 +677,9 @@ namespace BanjoBot
             float tag = 0;
 
             int statsRecorded = 0;
-            List <PlayerMatchStats> seasonMatchStats = player.GetMatchesBySeason(League.LeagueID, season);
-            foreach (var matchStats in seasonMatchStats)
-            {
-                if (matchStats.Match.StatsRecorded)
-                {
+            List<PlayerMatchStats> seasonMatchStats = player.GetMatchesBySeason(League.LeagueID, season);
+            foreach (var matchStats in seasonMatchStats) {
+                if (matchStats.Match.StatsRecorded) {
                     statsRecorded++;
                     goals += matchStats.Goals;
                     assist += matchStats.Assist;
@@ -689,21 +695,86 @@ namespace BanjoBot
                     tag += matchStats.TimeAsGoalie;
                 }
             }
-            args = new object[] {goals/statsRecorded, assist / statsRecorded, steals / statsRecorded,
-                turnovers / statsRecorded, st / statsRecorded, pickups / statsRecorded, passes / statsRecorded,
-                pr / statsRecorded, save / statsRecorded, points / statsRecorded, post / statsRecorded, tag / statsRecorded };
-            s += String.Format("{0,-10:F2} {1,-10:F2} {2,-10:F2} {3,-10:F2} {4,-10:F2} {5,-10:F2} {6,-10:F2} {7,-10:F2} {8,-10:P0} {9,-10:F2} {10,-10:F2} {11,-10:F2}\n", args);
-            s += "You played " + seasonMatchStats.Count + " Matches. Stats were recorded for " + statsRecorded + " Matches.";
+            PlayerStats playerStats = player.GetLeagueStat(League.LeagueID, season);
+            string message = $"**{player.User.Username}'s Profile**\n";
+            message += $"{"League",-12} {League.Name,26} \n";
+            message += $"{"Season",-12} {season,26} \n";
+            message += $"Matches: {playerStats.MatchCount,26} \n";
+            message += $"Wins: {playerStats.Wins,26} \n";
+            message += $"Losses: {playerStats.Losses,26} \n";
+            message += $"Winrate: {playerStats.MatchCount/playerStats.Wins,26} \n";
+            message += $"Streak: {playerStats.Streak,26} \n";
+            message += $"Rating: {playerStats.MMR,26} \n";
+            message += "\n";
+            message += $"**AverageStats**\n";
+            message += $"Goals: {statsRecorded/goals,26} \n";
+            message += $"Assist: {statsRecorded/assist,26} \n";
+            message += $"Steals: {statsRecorded/steals,26} \n";
+            message += $"Turnovers: {statsRecorded/turnovers,26} \n";
+            message += $"S-T: {statsRecorded/st,26} \n";
+            message += $"Pickups: {statsRecorded/pickups,26} \n";
+            message += $"Passes: {statsRecorded/passes,26} \n";
+            message += $"PassesReceived: {statsRecorded/pr,26} \n";
+            message += $"Saverate: {statsRecorded/save,26:0.0} \n";
+            message += $"Points: {statsRecorded/points,26} \n";
+            message += $"PosT: {statsRecorded/post,26} \n";
+            message += $"TAG: {statsRecorded/tag,26} \n";
+            message += $"\n*Stats for {statsRecorded} of {playerStats.MatchCount} games were recorded*";
+            builder.Description = message;
+            await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync(message);
 
-            if (statsRecorded == 0)
-            {
-                await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("You have played "+ seasonMatchStats.Count +" Matches. No Stats were recorded");
-            }
-            else
-            {
-                await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("```" + s + "```");
-            }
-           
+
+            //object[] args = new object[] { "Goals", "Assist", "Steals", "Turnovers", "S/T", "Pickups", "Passes", "PR", "Save", "Points", "PosT", "TAG"};
+            //String s = String.Format("{0,-10} {1,-10} {2,-10} {3,-10} {4,-10} {5,-10} {6,-10} {7,-10} {8,-10} {9,-10} {10,-10} {11,-10}\n", args);
+            //float goals = 0;
+            //float assist = 0;
+            //float steals = 0;
+            //float turnovers = 0;
+            //float st = 0;
+            //float pickups = 0;
+            //float passes = 0;
+            //float pr = 0;
+            //float save = 0;
+            //float points = 0;
+            //float post = 0;
+            //float tag = 0;
+
+            //int statsRecorded = 0;
+            //List <PlayerMatchStats> seasonMatchStats = player.GetMatchesBySeason(League.LeagueID, season);
+            //foreach (var matchStats in seasonMatchStats)
+            //{
+            //    if (matchStats.Match.StatsRecorded)
+            //    {
+            //        statsRecorded++;
+            //        goals += matchStats.Goals;
+            //        assist += matchStats.Assist;
+            //        steals += matchStats.Steals;
+            //        turnovers += matchStats.Turnovers;
+            //        st += matchStats.StealTurnDif;
+            //        pickups += matchStats.Pickups;
+            //        passes += matchStats.Passes;
+            //        pr += matchStats.PassesReceived;
+            //        save += matchStats.SaveRate;
+            //        points += matchStats.Points;
+            //        post += matchStats.PossessionTime;
+            //        tag += matchStats.TimeAsGoalie;
+            //    }
+            //}
+            //args = new object[] {goals/statsRecorded, assist / statsRecorded, steals / statsRecorded,
+            //    turnovers / statsRecorded, st / statsRecorded, pickups / statsRecorded, passes / statsRecorded,
+            //    pr / statsRecorded, save / statsRecorded, points / statsRecorded, post / statsRecorded, tag / statsRecorded };
+            //s += String.Format("{0,-10:F2} {1,-10:F2} {2,-10:F2} {3,-10:F2} {4,-10:F2} {5,-10:F2} {6,-10:F2} {7,-10:F2} {8,-10:P0} {9,-10:F2} {10,-10:F2} {11,-10:F2}\n", args);
+            //s += "You played " + seasonMatchStats.Count + " Matches. Stats were recorded for " + statsRecorded + " Matches.";
+
+            //if (statsRecorded == 0)
+            //{
+            //    await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("You have played "+ seasonMatchStats.Count +" Matches. No Stats were recorded");
+            //}
+            //else
+            //{
+            //    await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("```" + s + "```");
+            //}
+
         }
 
         public async Task GetMatchHistory(Player player, int season)
@@ -737,9 +808,9 @@ namespace BanjoBot
 
         }
 
-        public async Task GetFullPlayerStats(Player player)
+        public async Task ShowPlayerProfile(Player player)
         {
-            await GetFullPlayerStats(player, League.Season);
+            await ShowPlayerProfile(player, League.Season);
         }
 
         /// <summary>
@@ -796,7 +867,10 @@ namespace BanjoBot
                     if (player.User.Id != playerToRemove.Id && !Lobby.WaitingList.Contains(player))
                         Lobby.AddPlayer(player);
                 }
-                await textChannel.SendMessageAsync("Lobby recreated  (" + Lobby.WaitingList.Count() + "/8)");
+                string message = "";
+                if (League.DiscordInformation.LeagueRole != null)
+                    message = League.DiscordInformation.LeagueRole.Mention;
+                await textChannel.SendMessageAsync(message + "Lobby recreated  (" + Lobby.WaitingList.Count() + "/8)");
             }
             else
             {
