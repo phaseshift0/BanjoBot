@@ -360,6 +360,29 @@ namespace BanjoBot {
             await lc.KickPlayer(Context.Channel, player);
         }
 
+        [Command("changeSteam"), Summary("Changes the steamID of a user. !cs @player (moderator)"), Alias(new string[] { "cs" })]
+        public async Task ChangeSteam([Summary("@Player")]IGuildUser guildUser, ulong SteamID)
+        {
+            bool hasPermission = false;
+            foreach (var lc in _leagueCoordinator.GetLeagueControllersByServer((SocketGuild)Context.Guild)) {
+                if (CheckModeratorPermission((SocketGuildUser)Context.User, lc)) {
+                    hasPermission = true;
+                }
+            }
+            if (!hasPermission) {
+                return;
+            }
+
+            Player player = _leagueCoordinator.GetPlayerByDiscordID(guildUser.Id);
+            if (player == null) {
+                await ReplyAsync("Player not found");
+                return;
+            }
+
+            player.SteamID = SteamID;
+            await ReplyAsync("SteamID changed");
+        }
+
 
 
         [Command("accept"), Summary("Accepts a applicant. !accept <#league-channel> <@player>  (moderator)")]

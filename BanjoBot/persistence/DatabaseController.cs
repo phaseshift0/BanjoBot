@@ -138,24 +138,25 @@ namespace BanjoBot
 
 
         }
-
-        public async Task InsertNewMatch(Lobby game)
+        
+        public async Task<int> InsertNewMatch(int leagueID, int season, List<Player> blueteam, List<Player> redteam)
         {
             MySqlCommand command = new MySqlCommand();
             command.CommandText =
                 "Insert into matches (season, league_id, date) Values (@season,@league_id,@date); SELECT LAST_INSERT_ID()";
-            command.Parameters.AddWithValue("@season", game.League.Season);
-            command.Parameters.AddWithValue("@league_id", game.League.LeagueID);
+            command.Parameters.AddWithValue("@season", season);
+            command.Parameters.AddWithValue("@league_id", leagueID);
             command.Parameters.AddWithValue("@date", DateTime.Now);
             int matchID = await ExecuteScalar(command);
-            game.MatchID = matchID;
 
-            StringBuilder queryBuilder =
-                new StringBuilder("Insert into match_player_stats (steam_id,match_id, team) VALUES ");
-            for (int i = 0; i < game.WaitingList.Count; i++)
+            StringBuilder queryBuilder = new StringBuilder("Insert into match_player_stats (steam_id,match_id, team) VALUES ");
+            List<Player> allPlayers = new List<Player>();
+            allPlayers.AddRange(blueteam);
+            allPlayers.AddRange(redteam);
+            for (int i = 0; i < allPlayers.Count; i++)
             {
                 queryBuilder.AppendFormat("(@steam_id{0},@match_id{0},@team{0}),", i);
-                if (i == game.WaitingList.Count - 1)
+                if (i == allPlayers.Count - 1)
                 {
                     queryBuilder.Replace(',', ';', queryBuilder.Length - 1, 1);
                 }
@@ -163,16 +164,24 @@ namespace BanjoBot
 
             command = new MySqlCommand(queryBuilder.ToString());
             //assign each parameter its value
-            for (int i = 0; i < game.WaitingList.Count; i++)
+            for (int i = 0; i < blueteam.Count; i++)
             {
-                Teams team = game.RedList.Contains(game.WaitingList[i]) ? Teams.Red : Teams.Blue;
-                command.Parameters.AddWithValue("@steam_id" + i, game.WaitingList[i].SteamID);
+                Teams team = Teams.Blue;
+                command.Parameters.AddWithValue("@steam_id" + i, blueteam[i].SteamID);
                 command.Parameters.AddWithValue("@match_id" + i, matchID);
                 command.Parameters.AddWithValue("@team" + i, team);
+            }
 
+            for (int i = 0; i < redteam.Count; i++) {
+                Teams team = Teams.Red;
+                command.Parameters.AddWithValue("@steam_id" + i, redteam[i].SteamID);
+                command.Parameters.AddWithValue("@match_id" + i, matchID);
+                command.Parameters.AddWithValue("@team" + i, team);
             }
 
             await ExecuteNoQuery(command);
+
+            return matchID;
         }
 
         public async Task DrawMatch(Lobby game)
@@ -519,6 +528,7 @@ namespace BanjoBot
                     ulong steam_match_id = ulong.MinValue;
                     int season = 0;
                     ulong steam_id = 0;
+                    string hero = "";
                     int goals = 0;
                     int assist = 0;
                     int steals = 0;
@@ -599,6 +609,9 @@ namespace BanjoBot
                         else if (reader.GetName(i).Equals("winner")) {
                             winner = (Teams)reader.GetInt32(i);
                         }
+                        else if (reader.GetName(i).Equals("hero")) {
+                            hero = reader.GetString(i);
+                        }
                         else if (reader.GetName(i).Equals("stats_recorded")) {
                             statsRecorded = reader.GetBoolean(i);
                         }
@@ -622,7 +635,7 @@ namespace BanjoBot
                         matchResult = new MatchResult(match_id, leagueID, steam_match_id, season, winner, date, duration, new List<PlayerMatchStats>(), statsRecorded);
                         matches.Add(matchResult);
                     }
-                    matchResult.PlayerMatchStats.Add(new PlayerMatchStats(matchResult, steam_id, goals, assist, steals, turnovers, steal_turnover_difference, pickups, passes, passes_received, save_rate, points, possession_time, time_as_goalie, mmr_adjustment, streak_bonus, team, win));
+                    matchResult.PlayerMatchStats.Add(new PlayerMatchStats(matchResult, steam_id, hero ,goals, assist, steals, turnovers, steal_turnover_difference, pickups, passes, passes_received, save_rate, points, possession_time, time_as_goalie, mmr_adjustment, streak_bonus, team, win));
 
                 }
             }

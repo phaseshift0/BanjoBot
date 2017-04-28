@@ -11,8 +11,10 @@ using Discord.WebSocket;
 namespace BanjoBot {
     public class LeagueCoordinator
     {
+        private static readonly int PUBLIC_LEAGUE_ID = 1;
         private static readonly LeagueCoordinator instance = new LeagueCoordinator();
         public List<LeagueController> LeagueController { get; set; }
+        
 
         static LeagueCoordinator() {}
 
@@ -28,7 +30,7 @@ namespace BanjoBot {
 
         public void AddLeague(League league)
         {
-            LeagueController.Add(new LeagueController(this,league));
+            LeagueController.Add(new LeagueController(league));
         }
 
         public void AddLeague(List<League> leagues) {
@@ -44,6 +46,12 @@ namespace BanjoBot {
 
         public LeagueController GetLeagueController(SocketGuildChannel channel)
         {
+            if (channel == null)
+            {
+                System.Diagnostics.StackTrace t = new System.Diagnostics.StackTrace();
+                Console.WriteLine("Error channel == null\n" + t);
+            }
+
             foreach (LeagueController leagueController in LeagueController)
             {
                 if (leagueController.League.DiscordInformation != null && leagueController.League.DiscordInformation.DiscordServer != null)
@@ -53,6 +61,7 @@ namespace BanjoBot {
                 }
             }
 
+            Console.WriteLine("Channel not found?" + channel.Id);
             return null;
         }
 
@@ -98,6 +107,45 @@ namespace BanjoBot {
                     if (regplayer.SteamID == steamID) {
                         return regplayer;
                     }
+                }
+            }
+
+            return null;
+        }
+
+        public Lobby FindLobby(List<Player> players)
+        {
+            if (players.Count != 8)
+            {
+                return null;
+            }
+
+            Lobby lobby  = players.First().CurrentGame;
+
+            if (lobby == null)
+            {
+                return null;
+            }
+
+            foreach (var player in players)
+            {
+                Player result = lobby.WaitingList.Find(p => p.SteamID == player.SteamID);
+                if (result == null)
+                {
+                    return null;
+                }
+            }
+
+            return lobby;
+        }
+
+        public LeagueController GetPublicLeague()
+        {
+            foreach (var leagueController in LeagueController)
+            {
+                if (leagueController.League.LeagueID == PUBLIC_LEAGUE_ID)
+                {
+                    return leagueController;
                 }
             }
 

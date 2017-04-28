@@ -19,6 +19,7 @@ namespace BanjoBot
         private static Socket _serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         private static byte[] _buffer = new byte[1024];
         private LeagueCoordinator _leagueCoordinator;
+        private DatabaseController _db;
 
         const string getinfo = @"{ 
                     'AUTH_KEY' : 'a2g9xCvASDh321oc9DVe', 
@@ -85,9 +86,10 @@ namespace BanjoBot
                     }
                 }";
 
-        public SocketServer(LeagueCoordinator leagueCoordinator)
+        public SocketServer(LeagueCoordinator leagueCoordinator, DatabaseController db)
         {
             _leagueCoordinator = leagueCoordinator;
+            _db = db;
             SetupServer();
 
             //ProcessMessage(getinfo);
@@ -176,7 +178,12 @@ namespace BanjoBot
                 JToken jToken = jObject.GetValue("SteamIDs");
                 ulong[] steamIDs = jToken.Values<ulong>().ToArray();
                 List<Player> players = new List<Player>();
-          
+
+                if (steamIDs.Length != 8)
+                {
+                    return "";
+                }
+
                 for (int i = 0; i < steamIDs.Length; i++)
                 {
                     if (players.Count == 8)
@@ -189,30 +196,28 @@ namespace BanjoBot
                     {
                         players.Add(result);
                     }
+                    else
+                    {
+                        //Create new player for public league (ID: ?)
+                        Player newPlayer = new Player(steamIDs[i]);
+                        _db.RegisterPlayerToLeague(newPlayer, _leagueCoordinator.GetPublicLeague().League);
+                        //_leagueCoordinator.GetPublicLeague().RegisterPlayer()
+                        //players.Add(result);
+                    }
                 }
 
-                if (players.Count < 8)
-                {
-                    // not a league match
-                    return "";
-                }
-
-                //TODO: check if started
-                int matchID = Int32.MinValue;
-                if (players[0].CurrentGame != null)
-                {
-                    matchID = players[0].CurrentGame.MatchID;
-                    //leagueID = players[0].CurrentGame.League.LeagueID;
-                }
-                else
-                {
+                Lobby lobby = _leagueCoordinator.FindLobby(players);
+                if(lobby == null) {
                     // not a league match
 
-                    //REMOVE ME
+                    LeagueController lc = _leagueCoordinator.GetPublicLeague();
+                    League pubLeague = lc.League;
+                    //TODO: create new game in db
+
                     var response = new {
-                        LeagueID = 23,
-                        LeagueName = "EU-BBL",
-                        Season = 1,
+                        LeagueID = pubLeague.LeagueID,
+                        LeagueName = pubLeague.Name,
+                        Season = pubLeague.Season,
                         MatchID = 26,
                         Players = players.Select(player => new
                         {
@@ -228,21 +233,6 @@ namespace BanjoBot
                         })};
                     Console.WriteLine(JsonConvert.SerializeObject(response));
                     return JsonConvert.SerializeObject(response);
-                }
-
-                bool check = true;
-                foreach (var player in players)
-                {
-                    if (player != null && player.CurrentGame.MatchID != matchID)
-                    {
-                        check = false;
-                    }
-                }
-
-                if (!check)
-                {
-                    // not a league match
-                    return "";
                 }
                 else
                 {

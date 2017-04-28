@@ -8,6 +8,7 @@ namespace BanjoBot {
     public class PlayerMatchStats {
         public MatchResult Match { get; set; }
         public ulong SteamID { get; set; }
+        public String Hero { get; set; }
         public int Goals { get; set; }
         public int Assist { get; set; }
         public int Steals { get; set; }
@@ -25,9 +26,10 @@ namespace BanjoBot {
         public Teams Team { get; set; }
         public bool Win { get; set; }
 
-        public PlayerMatchStats(MatchResult match, ulong steamId, int goals, int assist, int steals, int turnovers, int stealTurnDif, int pickups, int passes, int passesReceived, float saveRate, int points, int possessionTime, int timeAsGoalie, int mmrAdjustment, int streakBonus, Teams team, bool win) {
+        public PlayerMatchStats(MatchResult match, ulong steamId, string hero, int goals, int assist, int steals, int turnovers, int stealTurnDif, int pickups, int passes, int passesReceived, float saveRate, int points, int possessionTime, int timeAsGoalie, int mmrAdjustment, int streakBonus, Teams team, bool win) {
             Match = match;
             SteamID = steamId;
+            Hero = hero;
             Goals = goals;
             Assist = assist;
             Steals = steals;
@@ -54,6 +56,7 @@ namespace BanjoBot {
         public PlayerMatchStats(MatchResult match, ulong steamId, int mmrAdjustment, int streakBonus, Teams team, bool win) {
             Match = match;
             SteamID = steamId;
+            Hero = "";
             Goals = 0;
             Assist = 0;
             Steals = 0;

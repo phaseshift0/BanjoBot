@@ -26,6 +26,13 @@ namespace BanjoBot
             Matches = new List<PlayerMatchStats>();
         }
 
+        public Player(ulong steamid) {
+            SteamID = steamid;
+            CurrentGame = null;
+            PlayerStats = new List<PlayerStats>();
+            Matches = new List<PlayerMatchStats>();
+        }
+
 
         public Player(ulong discord_id, ulong steamid)
         {
@@ -39,7 +46,7 @@ namespace BanjoBot
 
         public bool Equals(Player other)
         {
-            return User.Id == other.User.Id;
+            return SteamID == SteamID;
         }
 
         public string PlayerMMRString(int leagueID, int season)

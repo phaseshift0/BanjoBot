@@ -11,20 +11,18 @@ namespace BanjoBot
     public class LeagueController
     {
 
-        //TODO: Refactor: GameClosed, Ended, Stats update <- has to be more consistent and local
+        //TODO: Refactor: Split discord related stuff & controlling
         //TODO: Refactor: Entrypoint for controlling: checkPreconditions() -> Controlling -> SendResultString ->  Controlling
         //^ not its preconditions in start command, some controlling in there "Lobby=null"
         public League League;
-        private LeagueCoordinator leagueCoordinator;
         private Lobby Lobby { get; set; }
         public List<Lobby> RunningGames { get; set; }
         private DatabaseController _database;
 
-        public LeagueController(LeagueCoordinator leagueCoordinator, League league)
+        public LeagueController(League league)
         {
             RunningGames = new List<Lobby>();
             League = league;
-            leagueCoordinator = leagueCoordinator;
             _database = new DatabaseController();
         }
 
@@ -60,7 +58,7 @@ namespace BanjoBot
             Lobby.StartGame();
             RunningGames.Add(Lobby);
             await UpdateChannelWithLobby();
-            await _database.InsertNewMatch(Lobby);
+            await _database.InsertNewMatch(League.LeagueID,League.Season,Lobby.BlueList,Lobby.RedList);
         }
 
         private async Task<Lobby> HostGame(Player host)
@@ -520,6 +518,7 @@ namespace BanjoBot
                 await textChannel.SendMessageAsync("Vote recorded to cancel game by " + player.User.Username + " (" + Lobby.CancelCalls.Count() + "/" + Math.Ceiling((double)Lobby.WaitingList.Count() / 2) + ")");
             }   
         }
+
         /// <summary>
         /// Lists all of the players in the currently ActiveGame
         /// </summary>
@@ -675,9 +674,15 @@ namespace BanjoBot
             float points = 0;
             float post = 0;
             float tag = 0;
-
             int statsRecorded = 0;
+
             List<PlayerMatchStats> seasonMatchStats = player.GetMatchesBySeason(League.LeagueID, season);
+            if (seasonMatchStats.Count == 0)
+            {
+                await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("No stats found");
+                return;
+            }
+            
             foreach (var matchStats in seasonMatchStats) {
                 if (matchStats.Match.StatsRecorded) {
                     statsRecorded++;
@@ -696,101 +701,47 @@ namespace BanjoBot
                 }
             }
             PlayerStats playerStats = player.GetLeagueStat(League.LeagueID, season);
-            string message = $"**{player.User.Username}'s Profile**\n";
-            message += $"{"League",-12} {League.Name,26} \n";
-            message += $"{"Season",-12} {season,26} \n";
-            message += $"Matches: {playerStats.MatchCount,26} \n";
-            message += $"Wins: {playerStats.Wins,26} \n";
-            message += $"Losses: {playerStats.Losses,26} \n";
-            message += $"Winrate: {playerStats.MatchCount/playerStats.Wins,26} \n";
-            message += $"Streak: {playerStats.Streak,26} \n";
-            message += $"Rating: {playerStats.MMR,26} \n";
+            string message = $"**{player.User.Username}'s Profile**\n`";
+            message += $"{"League",-24} {League.Name,-12} \n";
+            message += $"{"Season",-24} {season,-12} \n";
+            message += $"{"Matches",-24} {playerStats.MatchCount,-12} \n";
+            message += $"{"Wins",-24} {playerStats.Wins,-12} \n";
+            message += $"{"Losses",-24} {playerStats.Losses,-12} \n";
+            message += $"{"Winrate",-24} {playerStats.MatchCount/playerStats.Wins,-12:P} \n";
+            message += $"{"Streak",-24} {playerStats.Streak,-12} \n";
+            message += $"{"Rating",-24} {playerStats.MMR,-12} `\n";
             message += "\n";
-            message += $"**AverageStats**\n";
-            message += $"Goals: {statsRecorded/goals,26} \n";
-            message += $"Assist: {statsRecorded/assist,26} \n";
-            message += $"Steals: {statsRecorded/steals,26} \n";
-            message += $"Turnovers: {statsRecorded/turnovers,26} \n";
-            message += $"S-T: {statsRecorded/st,26} \n";
-            message += $"Pickups: {statsRecorded/pickups,26} \n";
-            message += $"Passes: {statsRecorded/passes,26} \n";
-            message += $"PassesReceived: {statsRecorded/pr,26} \n";
-            message += $"Saverate: {statsRecorded/save,26:0.0} \n";
-            message += $"Points: {statsRecorded/points,26} \n";
-            message += $"PosT: {statsRecorded/post,26} \n";
-            message += $"TAG: {statsRecorded/tag,26} \n";
+            message += $"**AverageStats**\n`";
+            message += $"{"Goals",-24} {statsRecorded/goals,-12:N} \n";
+            message += $"{"Assist",-24} {statsRecorded/assist,-12:N} \n";
+            message += $"{"Steals",-24} {statsRecorded/steals,-12:N} \n";
+            message += $"{"Turnovers",-24} {statsRecorded/turnovers,-12:N} \n";
+            message += $"{"S-T",-24} {statsRecorded/st,-12:N} \n";
+            message += $"{"Pickups",-24} {statsRecorded/pickups,-12:N} \n";
+            message += $"{"Passes",-24} {statsRecorded/passes,-12:N} \n";
+            message += $"{"PR",-24} {statsRecorded/pr,-12:N} \n";
+            message += $"{"SaveRate",-24} {statsRecorded/save,-12:P} \n";
+            message += $"{"Points",-24} {statsRecorded/points,-12:N} \n";
+            message += $"{"PosT",-24} {statsRecorded/post,-12:N} \n";
+            message += $"{"TAG",-24} {statsRecorded/tag,-12:N} \n`";
             message += $"\n*Stats for {statsRecorded} of {playerStats.MatchCount} games were recorded*";
             builder.Description = message;
             await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync(message);
-
-
-            //object[] args = new object[] { "Goals", "Assist", "Steals", "Turnovers", "S/T", "Pickups", "Passes", "PR", "Save", "Points", "PosT", "TAG"};
-            //String s = String.Format("{0,-10} {1,-10} {2,-10} {3,-10} {4,-10} {5,-10} {6,-10} {7,-10} {8,-10} {9,-10} {10,-10} {11,-10}\n", args);
-            //float goals = 0;
-            //float assist = 0;
-            //float steals = 0;
-            //float turnovers = 0;
-            //float st = 0;
-            //float pickups = 0;
-            //float passes = 0;
-            //float pr = 0;
-            //float save = 0;
-            //float points = 0;
-            //float post = 0;
-            //float tag = 0;
-
-            //int statsRecorded = 0;
-            //List <PlayerMatchStats> seasonMatchStats = player.GetMatchesBySeason(League.LeagueID, season);
-            //foreach (var matchStats in seasonMatchStats)
-            //{
-            //    if (matchStats.Match.StatsRecorded)
-            //    {
-            //        statsRecorded++;
-            //        goals += matchStats.Goals;
-            //        assist += matchStats.Assist;
-            //        steals += matchStats.Steals;
-            //        turnovers += matchStats.Turnovers;
-            //        st += matchStats.StealTurnDif;
-            //        pickups += matchStats.Pickups;
-            //        passes += matchStats.Passes;
-            //        pr += matchStats.PassesReceived;
-            //        save += matchStats.SaveRate;
-            //        points += matchStats.Points;
-            //        post += matchStats.PossessionTime;
-            //        tag += matchStats.TimeAsGoalie;
-            //    }
-            //}
-            //args = new object[] {goals/statsRecorded, assist / statsRecorded, steals / statsRecorded,
-            //    turnovers / statsRecorded, st / statsRecorded, pickups / statsRecorded, passes / statsRecorded,
-            //    pr / statsRecorded, save / statsRecorded, points / statsRecorded, post / statsRecorded, tag / statsRecorded };
-            //s += String.Format("{0,-10:F2} {1,-10:F2} {2,-10:F2} {3,-10:F2} {4,-10:F2} {5,-10:F2} {6,-10:F2} {7,-10:F2} {8,-10:P0} {9,-10:F2} {10,-10:F2} {11,-10:F2}\n", args);
-            //s += "You played " + seasonMatchStats.Count + " Matches. Stats were recorded for " + statsRecorded + " Matches.";
-
-            //if (statsRecorded == 0)
-            //{
-            //    await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("You have played "+ seasonMatchStats.Count +" Matches. No Stats were recorded");
-            //}
-            //else
-            //{
-            //    await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("```" + s + "```");
-            //}
-
         }
 
         public async Task GetMatchHistory(Player player, int season)
         {
-            object[] args = new object[] { "MatchID", "Goals", "Assist", "Steals", "Turnovers", "S/T", "Pickups", "Passes", "PR", "Save", "Points", "PosT", "TAG", "Mmr", "Streak","StatsRecorded" };
-            String s = String.Format("{0,-10} {1,-8} {2,-8} {3,-8} {4,-8} {5,-8} {6,-8} {7,-8} {8,-8} {9,-8} {10,-8} {11,-8} {12,-8} {13,-8} {14,-8}{15,-8}\n", args);
+            object[] args = new object[] {"Date", "MatchID", "Goals", "Assist", "Steals", "Turnovers", "S/T", "Pickups", "Passes", "PR", "Save", "Points", "PosT", "TAG", "Mmr", "Streak","Stats","Hero" };
+            String s = String.Format("{0,-12} {1,-8} {17,-10} {2,-8} {3,-8} {4,-8} {5,-10} {6,-8} {7,-8} {8,-8} {9,-8} {10,-8} {11,-8} {12,-8} {13,-8} {14,-8} {15,-8} {16,-8}\n", args);
             List<PlayerMatchStats> allStats = player.GetMatchesBySeason(League.LeagueID, season);
-            foreach (var stats in allStats) {
-                if (s.Length > 1800) {
-                    await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("```" + s + "```");
-                    s = "";
-                }
-                args = new object[] {stats.Match.MatchID,stats.Goals, stats.Assist, stats.Steals, stats.Turnovers, stats.StealTurnDif, stats.Pickups, stats.Passes, stats.PassesReceived, stats.SaveRate, stats.Points,stats.PossessionTime,stats.TimeAsGoalie,stats.MmrAdjustment,stats.StreakBonus,stats.Match.StatsRecorded};
-                s += String.Format("{0,-8} {1,-8} {2,-8} {3,-8} {4,-8} {5,-8} {6,-8} {7,-8} {8,-8} {9,-8:P0} {10,-8} {11,-8} {12,-8} {13,-8} {14,-8}{15,-8}\n", args);
+            IOrderedEnumerable<PlayerMatchStats> orderedStats = allStats.OrderByDescending(stats => stats.Match.Date);
+            for(int i = 0; i < 10; i++)
+            {
+                PlayerMatchStats stats = orderedStats.ElementAt(i);
+                args = new object[] { DateTime.Parse(stats.Match.Date.ToString()).ToShortDateString(),stats.Match.MatchID,stats.Goals, stats.Assist, stats.Steals, stats.Turnovers, stats.StealTurnDif, stats.Pickups, stats.Passes, stats.PassesReceived, stats.SaveRate, stats.Points,stats.PossessionTime,stats.TimeAsGoalie,stats.MmrAdjustment,stats.StreakBonus,stats.Match.StatsRecorded,"Storm"};
+                s += String.Format("{0,-12} {1,-8} {17,-10} {2,-8} {3,-8} {4,-8} {5,-10} {6,-8} {7,-8} {8,-8} {9,-8:P0} {10,-8} {11,-8} {12,-8} {13,-8} {14,-8} {15,-8} {16,-8}\n", args);
             }
-            if (allStats.Count == 0)
+            if (!orderedStats.Any())
             {
                 await (await (player.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync("You have not played in season " + season);
             }
@@ -932,5 +883,6 @@ namespace BanjoBot
             System.Threading.Thread.Sleep(20 * 1000);
             message.DeleteAsync();
         }
+
     }
 }
