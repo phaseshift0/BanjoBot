@@ -58,7 +58,8 @@ namespace BanjoBot
             Lobby.StartGame();
             RunningGames.Add(Lobby);
             await UpdateChannelWithLobby();
-            await _database.InsertNewMatch(League.LeagueID,League.Season,Lobby.BlueList,Lobby.RedList);
+            int match_id = await _database.InsertNewMatch(League.LeagueID,League.Season,Lobby.BlueList,Lobby.RedList);
+            Lobby.MatchID = match_id;
         }
 
         private async Task<Lobby> HostGame(Player host)
@@ -100,7 +101,7 @@ namespace BanjoBot
 
             if (winnerTeam == Teams.Draw) {
                 await _database.DrawMatch(game);
-                await ((ITextChannel)League.DiscordInformation.Channel).SendMessageAsync("Closing lobby\n Game " + game.GetGameName() + " has ended in a draw. No stats have been recorded.");
+                await ((ITextChannel)League.DiscordInformation.Channel).SendMessageAsync("Closing lobby\nGame " + game.GetGameName() + " has ended in a draw. No stats have been recorded.");
                 return;
             }
 
@@ -436,7 +437,7 @@ namespace BanjoBot
 
             // If the game sucessfully started
             await StartGame();
-            String startmessage = Lobby.GetGameName() + " has been started by " + player.PlayerMMRString(League.LeagueID,League.Season) + ".";
+            String startmessage = Lobby.GetGameName() + "("+ Lobby.MatchID +")" + " has been started by " + player.PlayerMMRString(League.LeagueID,League.Season) + ".";
             // Prepare Blue Team
             String blueTeam = "Blue Team (" + Lobby.GetTeamMMR(Teams.Blue) + "): ";
             foreach (var p in Lobby.BlueList)
@@ -457,7 +458,7 @@ namespace BanjoBot
 
             foreach (var p in Lobby.WaitingList)
             {
-                await (await (p.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync(Lobby.GetGameName() +  "has been started");
+                await (await (p.User as IGuildUser).CreateDMChannelAsync()).SendMessageAsync(Lobby.GetGameName() +  " has been started");
             }
 
             Lobby = null;
@@ -848,12 +849,15 @@ namespace BanjoBot
                 args = new object[] { player.User.Username, stats.MMR, stats.MatchCount, stats.Wins, stats.Losses };
                 s += String.Format("{0,-10} {1,-6} {2,-10} {3,-12} {4,-10}\n", args);
 
-                player.PlayerStats.Add(new PlayerStats(League.LeagueID,League.Season + 1));
-                await _database.UpdatePlayerStats(player, stats);
+                PlayerStats newStats = new PlayerStats(League.LeagueID, League.Season + 1);
+                player.PlayerStats.Add(newStats);
+                await _database.UpdatePlayerStats(player, newStats);
             }
 
             await textChannel.SendMessageAsync("```" + s + "```");
             League.Season++;
+            League.Matches = new List<MatchResult>();
+            League.GameCounter = 0;
             await _database.UpdateLeague(League);
         }
         
