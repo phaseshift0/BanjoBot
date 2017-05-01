@@ -837,28 +837,34 @@ namespace BanjoBot
 
         public async Task StartNewSeason(IMessageChannel textChannel)
         {
-            await textChannel.SendMessageAsync("Season " + League.Season + " has ended.");
-            await textChannel.SendMessageAsync("Top Players Season " + League.Season + ": ");
+            String message = "";
+            message = "**Season " + League.Season + " has ended.**\n";
+            message += "**Top Players Season " + League.Season + ": **\n";
             var sortedDict = from entry in League.RegisteredPlayers orderby entry.GetLeagueStat(League.LeagueID, League.Season).MMR descending select entry;
 
             object[] args = new object[] { "Name", "MMR", "Matches", "Wins", "Losses" };
-            String s = String.Format("{0,-10} {1,-6} {2,-10} {3,-12} {4,-10}\n", args);
-            foreach (var player in sortedDict)
-            {
-                PlayerStats stats = player.GetLeagueStat(League.LeagueID, League.Season);
-                args = new object[] { player.User.Username, stats.MMR, stats.MatchCount, stats.Wins, stats.Losses };
-                s += String.Format("{0,-10} {1,-6} {2,-10} {3,-12} {4,-10}\n", args);
+            message += String.Format("{0,-10} {1,-10} {2,-10} {3,-10} {4,-10}\n", args);
+            for (int i = 0; i < sortedDict.Count(); i++) {
+                if (i < 10) {
+                    PlayerStats stats = sortedDict.ElementAt(i).GetLeagueStat(League.LeagueID, League.Season);
+                    string username = sortedDict.ElementAt(i).User.Username.Length > 8
+                        ? sortedDict.ElementAt(i).User.Username.Substring(0, 8)
+                        : sortedDict.ElementAt(i).User.Username;
+                    args = new object[] { username, stats.MMR, stats.MatchCount, stats.Wins, stats.Losses };
+                    message += String.Format("{0,-10} {1,-10} {2,-10} {3,-10} {4,-10}\n", args);
+                }
 
                 PlayerStats newStats = new PlayerStats(League.LeagueID, League.Season + 1);
-                player.PlayerStats.Add(newStats);
-                await _database.UpdatePlayerStats(player, newStats);
+                sortedDict.ElementAt(i).PlayerStats.Add(newStats);
+                await _database.UpdatePlayerStats(sortedDict.ElementAt(i), newStats);
             }
 
-            await textChannel.SendMessageAsync("```" + s + "```");
+            await textChannel.SendMessageAsync("```" + message + "```");
             League.Season++;
             League.Matches = new List<MatchResult>();
             League.GameCounter = 0;
             await _database.UpdateLeague(League);
+        
         }
         
         /// <summary>
