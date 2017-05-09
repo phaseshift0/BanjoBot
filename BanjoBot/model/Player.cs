@@ -46,12 +46,20 @@ namespace BanjoBot
 
         public bool Equals(Player other)
         {
-            return SteamID == SteamID;
+            return SteamID == other.SteamID;
         }
 
         public string PlayerMMRString(int leagueID, int season)
         {
-            return User.Username + "(" + GetLeagueStat(leagueID, season).MMR + ")";
+            //TODO: REMOVE
+            if (User != null)
+            {
+                return User.Username + "(" + GetLeagueStat(leagueID, season).MMR + ")";
+            }
+            else
+            {
+                return discordID + "(" + GetLeagueStat(leagueID, season).MMR + ")";
+            }
         }
 
         public PlayerStats GetLeagueStat(int leagueID, int season) {

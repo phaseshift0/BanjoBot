@@ -236,6 +236,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Controller\CommandModule.cs" />
+    <Compile Include="model\MatchMaker.cs" />
     <Compile Include="persistence\DatabaseController.cs" />
     <Compile Include="model\DiscordInformation.cs" />
     <Compile Include="Controller\LeagueController.cs" />

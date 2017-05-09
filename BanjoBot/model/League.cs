@@ -44,5 +44,14 @@ namespace BanjoBot {
             }
             return null;
         }
+
+        public bool HasDiscord() {
+            if (DiscordInformation != null && DiscordInformation.DiscordServer != null)
+            {
+                return true;
+            }
+
+            return false;
+        }
     }
 }

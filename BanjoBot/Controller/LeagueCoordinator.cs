@@ -13,14 +13,14 @@ namespace BanjoBot {
     {
         private static readonly int PUBLIC_LEAGUE_ID = 1;
         private static readonly LeagueCoordinator instance = new LeagueCoordinator();
-        public List<LeagueController> LeagueController { get; set; }
+        public List<LeagueController> LeagueControllers { get; set; }
         
 
         static LeagueCoordinator() {}
 
         private LeagueCoordinator()
         {
-            LeagueController = new List<LeagueController>();
+            LeagueControllers = new List<LeagueController>();
         }
 
         public static LeagueCoordinator Instance
@@ -30,7 +30,7 @@ namespace BanjoBot {
 
         public void AddLeague(League league)
         {
-            LeagueController.Add(new LeagueController(league));
+            LeagueControllers.Add(new LeagueController(league));
         }
 
         public void AddLeague(List<League> leagues) {
@@ -41,7 +41,7 @@ namespace BanjoBot {
         }
 
         public void DeleteLeague(LeagueController league) {
-            LeagueController.Remove(league);
+            LeagueControllers.Remove(league);
         }
 
         public LeagueController GetLeagueController(SocketGuildChannel channel)
@@ -52,7 +52,7 @@ namespace BanjoBot {
                 Console.WriteLine("Error channel == null\n" + t);
             }
 
-            foreach (LeagueController leagueController in LeagueController)
+            foreach (LeagueController leagueController in LeagueControllers)
             {
                 if (leagueController.League.DiscordInformation != null && leagueController.League.DiscordInformation.DiscordServer != null)
                 {
@@ -68,7 +68,7 @@ namespace BanjoBot {
         public List<LeagueController> GetLeagueControllersByServer(SocketGuild guild)
         {
             List<LeagueController> result = new List<LeagueController>();
-            foreach (LeagueController leagueController in LeagueController) {
+            foreach (LeagueController leagueController in LeagueControllers) {
                 if (leagueController.League.DiscordInformation != null && leagueController.League.DiscordInformation.DiscordServerId == guild.Id) {
                     result.Add(leagueController);
                 }
@@ -77,7 +77,7 @@ namespace BanjoBot {
         }
 
         public LeagueController GetLeagueController(int LeagueID) {
-            foreach (LeagueController leagueController in LeagueController) {
+            foreach (LeagueController leagueController in LeagueControllers) {
                 if (leagueController.League.LeagueID == LeagueID) {
                     return leagueController;
                 }
@@ -87,7 +87,7 @@ namespace BanjoBot {
         }
 
         public Player GetPlayerByDiscordID(ulong userID) {
-            foreach (var lc in LeagueController)
+            foreach (var lc in LeagueControllers)
             {
                 foreach (var regplayer in lc.League.RegisteredPlayers)
                 {
@@ -102,7 +102,7 @@ namespace BanjoBot {
 
 
         public Player GetPlayerBySteamID(ulong steamID) {
-            foreach (var lc in LeagueController) {
+            foreach (var lc in LeagueControllers) {
                 foreach (var regplayer in lc.League.RegisteredPlayers) {
                     if (regplayer.SteamID == steamID) {
                         return regplayer;
@@ -141,7 +141,7 @@ namespace BanjoBot {
 
         public LeagueController GetPublicLeague()
         {
-            foreach (var leagueController in LeagueController)
+            foreach (var leagueController in LeagueControllers)
             {
                 if (leagueController.League.LeagueID == PUBLIC_LEAGUE_ID)
                 {

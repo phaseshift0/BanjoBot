@@ -51,6 +51,7 @@ namespace BanjoBot
                         'Duration' : '1800',
                         'PlayerMatchStats': [
                             {
+                                'HeroID' : '12',
                                 'SteamID':'12353453',
                                 'Goals':'4',
                                 'Assist':'2',
@@ -186,11 +187,6 @@ namespace BanjoBot
 
                 for (int i = 0; i < steamIDs.Length; i++)
                 {
-                    if (players.Count == 8)
-                    {
-                        break;    
-                    }
-
                     Player result = _leagueCoordinator.GetPlayerBySteamID(steamIDs[i]);
                     if (result != null)
                     {
@@ -198,11 +194,11 @@ namespace BanjoBot
                     }
                     else
                     {
-                        //Create new player for public league (ID: ?)
+                        //Create new player for public league
                         Player newPlayer = new Player(steamIDs[i]);
                         _db.RegisterPlayerToLeague(newPlayer, _leagueCoordinator.GetPublicLeague().League);
-                        //_leagueCoordinator.GetPublicLeague().RegisterPlayer()
-                        //players.Add(result);
+                        _leagueCoordinator.GetPublicLeague().League.RegisteredPlayers.Add(newPlayer);
+                        players.Add(result);
                     }
                 }
 
@@ -212,57 +208,53 @@ namespace BanjoBot
 
                     LeagueController lc = _leagueCoordinator.GetPublicLeague();
                     League pubLeague = lc.League;
-                    //TODO: create new game in db
 
                     var response = new {
                         LeagueID = pubLeague.LeagueID,
                         LeagueName = pubLeague.Name,
                         Season = pubLeague.Season,
-                        MatchID = 26,
+                        MatchID = -1,
                         Players = players.Select(player => new
                         {
                             SteamID = player.SteamID,
-                            Team = Teams.Red,//player.CurrentGame.BlueWinCalls.Contains(player) ? Teams.Blue : Teams.Red,
+                            Team = Teams.None,
                             MatchesCount = player.GetLeagueStat(23,1).MatchCount,
-                            Wins = player.GetLeagueStat(23,1).Wins,
-                            Losses = player.GetLeagueStat(23,1).Losses,
-                            MMR = player.GetLeagueStat(23,1).MMR,
-                            Streak = player.GetLeagueStat(23,1).Streak
-                           
-
-                        })};
-                    Console.WriteLine(JsonConvert.SerializeObject(response));
+                            Wins = player.GetLeagueStat(pubLeague.LeagueID, pubLeague.Season).Wins,
+                            Losses = player.GetLeagueStat(pubLeague.LeagueID, pubLeague.Season).Losses,
+                            MMR = player.GetLeagueStat(pubLeague.LeagueID, pubLeague.Season).MMR,
+                            Streak = player.GetLeagueStat(pubLeague.LeagueID, pubLeague.Season).Streak
+                        })
+                    };
                     return JsonConvert.SerializeObject(response);
                 }
                 else
                 {
-                    // remove constants to match details
+                    League league = lobby.League;
                     var response = new {
-                        LeagueID = 23,
-                        LeagueName = "EU-BBL",
-                        Season = 1,
-                        MatchID = 26,
+                        LeagueID = league.LeagueID,
+                        LeagueName = league.Name,
+                        Season = league.Season,
+                        MatchID = lobby.MatchID,
                         Players = players.Select(player => new {
                             SteamID = player.SteamID,
-                            Team = Teams.Red,//player.CurrentGame.BlueWinCalls.Contains(player) ? Teams.Blue : Teams.Red,
-                            MatchesCount = player.GetLeagueStat(23, 1).MatchCount,
-                            Wins = player.GetLeagueStat(23, 1).Wins,
-                            Losses = player.GetLeagueStat(23, 1).Losses,
-                            MMR = player.GetLeagueStat(23, 1).MMR,
-                            Streak = player.GetLeagueStat(23, 1).Streak
+                            Team = lobby.BlueWinCalls.Contains(player) ? Teams.Blue : Teams.Red,
+                            MatchesCount = player.GetLeagueStat(league.LeagueID, league.Season).MatchCount,
+                            Wins = player.GetLeagueStat(league.LeagueID, league.Season).Wins,
+                            Losses = player.GetLeagueStat(league.LeagueID, league.Season).Losses,
+                            MMR = player.GetLeagueStat(league.LeagueID, league.Season).MMR,
+                            Streak = player.GetLeagueStat(league.LeagueID, league.Season).Streak
                           
                         })
                     };
-                    Console.WriteLine(JsonConvert.SerializeObject(response));
                     return JsonConvert.SerializeObject(response);
                 }
-
             }
             catch (Exception e) {
-
                 Console.WriteLine(e.Message);
-                return "Error";
+                return "";
             }
+
+           
         }
 
         private string CreateMatchResult(JObject json)
@@ -295,10 +287,10 @@ namespace BanjoBot
             catch (Exception e)
             {
                 Console.WriteLine(e.Message);
-                return "error";
+                return "";
             }
 
-            return "error";
+            return "";
         }
 
     }

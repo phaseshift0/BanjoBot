@@ -79,23 +79,22 @@ namespace BanjoBot
         {
             Console.Write("Load Playerbase...");
             List<Player> allPlayers = await _databaseController.GetPlayerBase(_leagueCoordinator);
-            foreach (var player in allPlayers)
+            foreach (Player player in allPlayers)
             {
-                foreach (var leagueController in _leagueCoordinator.LeagueController)
+                foreach (var playerLeagueStat in player.PlayerStats)
                 {
-                    foreach (var playerLeagueStat in player.PlayerStats)
+                    LeagueController lc = _leagueCoordinator.GetLeagueController(playerLeagueStat.LeagueID);
+                    if (!lc.League.RegisteredPlayers.Contains(player))
                     {
-                        if (playerLeagueStat.LeagueID == leagueController.League.LeagueID)
-                        {
-                            leagueController.League.RegisteredPlayers.Add(player);
-                        }
+                        lc.League.RegisteredPlayers.Add(player);
                     }
                 }
+                
             }
             Console.WriteLine("done!");
 
             Console.Write("Load Applicants...");
-            foreach (var lc in _leagueCoordinator.LeagueController)
+            foreach (var lc in _leagueCoordinator.LeagueControllers)
             {
                 lc.League.Applicants = await _databaseController.GetApplicants(_leagueCoordinator, lc.League);
             }
@@ -104,7 +103,7 @@ namespace BanjoBot
 
         private async Task LoadMatchHistory() {
             Console.Write("Load match history...");
-            foreach (var lc in _leagueCoordinator.LeagueController)
+            foreach (var lc in _leagueCoordinator.LeagueControllers)
             {
                 List<MatchResult> matches = await _databaseController.GetMatchHistory(lc.League.LeagueID);
                 lc.League.Matches = matches;

@@ -397,12 +397,12 @@ namespace BanjoBot
         {
             List<Player> result = new List<Player>();
             MySqlCommand command = new MySqlCommand();
-            int leagueCount = server.LeagueController.Count;
+            int leagueCount = server.LeagueControllers.Count;
             var params1 = new string[leagueCount];
             for (int i = 0; i < leagueCount; i++)
             {
                 params1[i] = string.Format("@leagueid{0}", i);
-                command.Parameters.AddWithValue(params1[i], server.LeagueController[i].League.LeagueID);
+                command.Parameters.AddWithValue(params1[i], server.LeagueControllers[i].League.LeagueID);
             }
 
             command.CommandText = string.Format("Select * from players p " +
@@ -528,7 +528,7 @@ namespace BanjoBot
                     ulong steam_match_id = ulong.MinValue;
                     int season = 0;
                     ulong steam_id = 0;
-                    string hero = "";
+                    int heroID = -1;
                     int goals = 0;
                     int assist = 0;
                     int steals = 0;
@@ -610,7 +610,7 @@ namespace BanjoBot
                             winner = (Teams)reader.GetInt32(i);
                         }
                         else if (reader.GetName(i).Equals("hero")) {
-                            hero = reader.GetString(i);
+                            heroID = reader.GetInt32(i);
                         }
                         else if (reader.GetName(i).Equals("stats_recorded")) {
                             statsRecorded = reader.GetBoolean(i);
@@ -635,7 +635,7 @@ namespace BanjoBot
                         matchResult = new MatchResult(match_id, leagueID, steam_match_id, season, winner, date, duration, new List<PlayerMatchStats>(), statsRecorded);
                         matches.Add(matchResult);
                     }
-                    matchResult.PlayerMatchStats.Add(new PlayerMatchStats(matchResult, steam_id, hero ,goals, assist, steals, turnovers, steal_turnover_difference, pickups, passes, passes_received, save_rate, points, possession_time, time_as_goalie, mmr_adjustment, streak_bonus, team, win));
+                    matchResult.PlayerMatchStats.Add(new PlayerMatchStats(matchResult, steam_id, heroID, goals, assist, steals, turnovers, steal_turnover_difference, pickups, passes, passes_received, save_rate, points, possession_time, time_as_goalie, mmr_adjustment, streak_bonus, team, win));
 
                 }
             }

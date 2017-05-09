@@ -14,6 +14,7 @@ namespace BanjoBot
 
     public class Lobby
     {
+        //TODO: extract Matchmaker into own class MatchMaker with Matchmaker(List<Players>) & AssignTeams() & GetTeamBlue() & GetTeamRed() & GetMMRAdjustment()
         //TODO: persistent Lobby, Add Date
         // Constants
         public const int MAXPLAYERS    = 8;
