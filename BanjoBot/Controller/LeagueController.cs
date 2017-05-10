@@ -4,6 +4,7 @@ using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using BanjoBot.model;
 using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
@@ -31,17 +32,6 @@ namespace BanjoBot
         private bool LobbyExists()
         {
             return Lobby != null;
-        }
-
-        private async Task UpdateChannelWithLobby() {
-            SocketTextChannel channel = (SocketTextChannel)League.DiscordInformation.Channel;
-            string topic = "";
-            if (Lobby == null)
-                topic = "Games in progress: " + RunningGames.Count;
-            else
-                topic = "Open Lobby (" + Lobby.WaitingList.Count + "/8)" + "    Games in progress: " + RunningGames.Count;
-
-            await channel.ModifyAsync(channelProperties => channelProperties.Topic = topic);
         }
 
         private async Task CancelLobby()
@@ -88,13 +78,71 @@ namespace BanjoBot
         }
 
 
-        private async Task CloseGame(Lobby game, Teams winnerTeam, MatchResult matchData = null)
+        private async Task CloseGame(Teams winnerTeam, MatchResult match)
         {
-            RunningGames.Remove(game);
-            game.Winner = winnerTeam;
-            foreach (Player player in game.WaitingList) {
-                player.CurrentGame = null;
+            //was ist relevant?
+            //matchresult added in league. matchresult added in player. matchplayerstats added in player
+            //adjust playerstats
+            //db_updatematch, updateplayermatch ohne insert für public mmr?
+            //db_updateplayerstats
+            //db_updateleague
+
+            //Adding missing details
+            match.StatsRecorded = true;
+            match.Date = DateTime.Now;
+
+            List<Player> winner = new List<Player>();
+            List<Player> looser = new List<Player>();
+            foreach (var stats in match.PlayerMatchStats)
+            {
+                Player player = League.RegisteredPlayers.Find(p => p.SteamID == stats.SteamID);
+                if (stats.Win)
+                    winner.Add(player);
+                else
+                    looser.Add(player);
             }
+            int mmrAdjustment = MatchMaker.CalculateMmrAdjustment(winner, looser, League.LeagueID, League.Season);
+
+            foreach (var stats in match.PlayerMatchStats)
+            {
+                Player player = League.RegisteredPlayers.Find(p => p.SteamID == stats.SteamID);
+                player.CurrentGame = null;
+
+                stats.MmrAdjustment = mmrAdjustment;
+                if (stats.Team == winnerTeam)
+                {
+                    stats.MmrAdjustment = mmrAdjustment;
+                    stats.StreakBonus = 2* player.GetLeagueStat(League.LeagueID, League.Season).Streak;
+                    stats.Win = true;
+                }
+                else {
+                    stats.MmrAdjustment = -mmrAdjustment;
+                    stats.StreakBonus = 0;
+                    stats.Win = false;
+                }
+
+                player.Matches.Add(stats);
+            }
+            
+
+            await _database.UpdateMatchResult(match); //TODO: Check Crash for pub mmr
+            League.Matches.Add(match);
+
+            AdjustPlayerStats(winner, looser);
+            List<Player> allPlayer = new List<Player>();
+            allPlayer.AddRange(winner);
+            allPlayer.AddRange(looser);
+            foreach (var player in allPlayer) {
+                await _database.UpdatePlayerStats(player, player.GetLeagueStat(League.LeagueID, League.Season)); //TODO: Check Crash for pub mmr
+            }
+         
+        }
+
+        public async Task CloseDiscordGame(Lobby game, Teams winnerTeam, MatchResult match = null)
+        {
+            RunningGames.Remove(game); 
+            game.Winner = winnerTeam;
+
             await UpdateChannelWithLobby();
             if (game.StartMessage != null) {
                 await game.StartMessage.UnpinAsync();
@@ -105,111 +153,65 @@ namespace BanjoBot
                 return;
             }
 
-            game.MmrAdjustment = game.CalculateMmrAdjustment();
-            MatchResult matchResult = matchData;
-            if (matchData == null)
-            {
-                matchResult = new MatchResult(game);
-            }
-            else
-            {
-                foreach (var stats in matchData.PlayerMatchStats)
-                {
-                    Player player = game.GetPlayerBySteamID(stats.SteamID);
-                    stats.MmrAdjustment = game.MmrAdjustment;
-                    if (stats.Team == winnerTeam)
-                    {
-                        stats.MmrAdjustment = game.MmrAdjustment;
-                        stats.StreakBonus = 2* player.GetLeagueStat(League.LeagueID, League.Season).Streak;       
-                    }
-                    else {
-                        stats.MmrAdjustment = -game.MmrAdjustment;
-                        stats.StreakBonus = 0;
-                    }
-                    stats.Win = true;
-                    stats.SteamID = player.SteamID;
-                    player.Matches.Add(stats);
-                }
-            }
-            await _database.UpdateMatchResult(matchResult);
-            League.Matches.Add(matchResult);
+            if(match == null)
+                match = new MatchResult(game);
+            await CloseGame(winnerTeam, match);
 
-            AdjustPlayerStats(game, winnerTeam);
-            foreach (var player in game.WaitingList) {
-                await _database.UpdatePlayerStats(player, player.GetLeagueStat(game.League.LeagueID, game.League.Season));
+            List<Player> winner = new List<Player>();
+            List<Player> looser = new List<Player>();
+            foreach (var player in game.WaitingList)
+            {
+                if ((game.RedList.Contains(player) && winnerTeam == Teams.Red) || (game.BlueList.Contains(player) && winnerTeam == Teams.Blue))
+                    winner.Add(player);
+                else
+                    looser.Add(player);
             }
-            printGameResult(game, winnerTeam, (ITextChannel)League.DiscordInformation.Channel);
+            int mmrAdjustment = MatchMaker.CalculateMmrAdjustment(winner, looser, League.LeagueID, League.Season);
+
+            printGameResult(game, mmrAdjustment,winnerTeam, (ITextChannel)League.DiscordInformation.Channel);
         }
-        
+
+
         public async Task CloseGameByEvent(MatchResult matchResult) {
-           
             Lobby lobby = null;
             foreach (var game in RunningGames) {
                 if (game.MatchID == matchResult.MatchID) {
                     lobby = game;
                 }
             }
-
-            if (lobby == null)
-            {
-                return;
-            }
-
-            matchResult.StatsRecorded = true;
-            matchResult.Date = DateTime.Now;
-             
-            await CloseGame(lobby, matchResult.Winner, matchResult);
+            if (lobby != null)
+                await CloseDiscordGame(lobby, matchResult.Winner, matchResult);
+            else
+                await CloseGame(matchResult.Winner, matchResult);
         }
 
         public async Task DrawMatch(Lobby game)
         {
-            await _database.DrawMatch(game);
-            await SendMessage((ITextChannel)League.DiscordInformation.Channel, "Closing lobby\nGame " + game.GetGameName() + " has ended in a draw. No stats have been recorded.");
+            await _database.DrawMatch(game.MatchID);
+            await SendMessage((ITextChannel)League.DiscordInformation.Channel, "Game " + game.GetGameName() + " has ended in a draw. No stats have been recorded.");
         }
 
-        public void AdjustPlayerStats(Lobby game, Teams winner)
-        { 
-            if (winner == Teams.Blue)
-            {
-                foreach (var user in game.BlueList)
-                {
-                    user.IncWins(League.LeagueID, League.Season);
-                    user.IncMMR(League.LeagueID, League.Season,
-                         game.MmrAdjustment + 2*user.GetLeagueStat(League.LeagueID, League.Season).Streak);
-                    user.IncStreak(League.LeagueID, League.Season);
-                    user.IncMatches(League.LeagueID, League.Season);
-                }
-                foreach (var user in game.RedList)
-                {
+        public void AdjustPlayerStats(List<Player> winner, List<Player> looser)
+        {
+            int mmrAdjustment = MatchMaker.CalculateMmrAdjustment(winner, looser, League.LeagueID, League.Season);
 
-                    user.IncLosses(League.LeagueID, League.Season);
-                    user.SetStreakZero(League.LeagueID, League.Season);
-                    user.DecMMR(League.LeagueID, League.Season, game.MmrAdjustment);
-                    user.IncMatches(League.LeagueID, League.Season);
-                    if (user.GetLeagueStat(League.LeagueID, League.Season).MMR < 0)
-                        user.SetMMR(League.LeagueID, League.Season, 0);
-                }
+            foreach (var user in winner)
+            {
+                user.IncWins(League.LeagueID, League.Season);
+                user.IncMMR(League.LeagueID, League.Season,
+                        mmrAdjustment + 2*user.GetLeagueStat(League.LeagueID, League.Season).Streak);
+                user.IncStreak(League.LeagueID, League.Season);
+                user.IncMatches(League.LeagueID, League.Season);
             }
 
-            if (winner == Teams.Red)
+            foreach (var user in looser)
             {
-                foreach (var user in game.BlueList)
-                {
-                    user.IncLosses(League.LeagueID, League.Season);
-                    user.SetStreakZero(League.LeagueID, League.Season);
-                    user.DecMMR(League.LeagueID, League.Season, game.MmrAdjustment);
-                    user.IncMatches(League.LeagueID, League.Season);
-                    if (user.GetLeagueStat(League.LeagueID, League.Season).MMR < 0)
-                        user.SetMMR(League.LeagueID, League.Season, 0);
-                }
-                foreach (var user in game.RedList)
-                {
-                    user.IncWins(League.LeagueID, League.Season);
-                    user.IncMMR(League.LeagueID, League.Season,
-                         game.MmrAdjustment + 2*user.GetLeagueStat(League.LeagueID, League.Season).Streak);
-                    user.IncStreak(League.LeagueID, League.Season);
-                    user.IncMatches(League.LeagueID, League.Season);
-                }
+                user.IncLosses(League.LeagueID, League.Season);
+                user.SetStreakZero(League.LeagueID, League.Season);
+                user.DecMMR(League.LeagueID, League.Season, mmrAdjustment);
+                user.IncMatches(League.LeagueID, League.Season);
+                if (user.GetLeagueStat(League.LeagueID, League.Season).MMR < 0)
+                    user.SetMMR(League.LeagueID, League.Season, 0);
             }
         }
 
@@ -228,21 +230,21 @@ namespace BanjoBot
             }
 
 
-            await CloseGame(startedGame, team);
+            await CloseDiscordGame(startedGame, team);
 
         }
 
-        private async void printGameResult(Lobby game, Teams winnerTeam, ITextChannel textChannel) {
+        private async void printGameResult(Lobby game, int mmr, Teams winnerTeam, ITextChannel textChannel) {
             string message = "Closing lobby\n";
 
             switch (winnerTeam) {
                 case Teams.Red:
                     message += "Red team has won " + game.GetGameName() + "!\n";
-                    message += GetGameResultString(game, Teams.Red);
+                    message += GetGameResultString(game, mmr, Teams.Red);
                     break;
                 case Teams.Blue:
                     message += "Blue team has won " + game.GetGameName() + "!\n";
-                    message += GetGameResultString(game, Teams.Blue);
+                    message += GetGameResultString(game, mmr, Teams.Blue);
 
                     break;
                 case Teams.Draw:
@@ -254,7 +256,7 @@ namespace BanjoBot
 
         }
 
-        private String GetGameResultString(Lobby game, Teams winner) {
+        private String GetGameResultString(Lobby game, int mmr, Teams winner) {
             char blueSign = '+';
             char redSign = '+';
             if (Teams.Blue == winner)
@@ -263,7 +265,7 @@ namespace BanjoBot
                 blueSign = '-';
 
             String message = "";
-            message += "Blue team (" + blueSign + game.MmrAdjustment + "): ";
+            message += "Blue team (" + blueSign + mmr + "): ";
             foreach (var player in game.BlueList) {
                 if (player.GetLeagueStat(League.LeagueID, League.Season).Streak > 1)
                     message += player.PlayerMMRString(League.LeagueID, League.Season) + "+" + 2 * (player.GetLeagueStat(League.LeagueID, League.Season).Streak - 1) + " ";
@@ -271,7 +273,7 @@ namespace BanjoBot
                     message += player.PlayerMMRString(League.LeagueID, League.Season) + " ";
             }
             message += "\n";
-            message += "Red team (" + redSign + game.MmrAdjustment + "): ";
+            message += "Red team (" + redSign + mmr + "): ";
             foreach (var player in game.RedList) {
                 if (player.GetLeagueStat(League.LeagueID, League.Season).Streak > 1)
                     message += player.PlayerMMRString(League.LeagueID, League.Season) + "+" + 2 * (player.GetLeagueStat(League.LeagueID, League.Season).Streak - 1) + " ";
@@ -610,13 +612,13 @@ namespace BanjoBot
 
             if (game.BlueWinCalls.Count == Lobby.VOTETHRESHOLD)
             {
-                await CloseGame(game, Teams.Blue);
+                await CloseDiscordGame(game, Teams.Blue);
             }
             if (game.RedWinCalls.Count == Lobby.VOTETHRESHOLD) {
-                await CloseGame(game, Teams.Red);
+                await CloseDiscordGame(game, Teams.Red);
             }
             if (game.DrawCalls.Count == Lobby.VOTETHRESHOLD) {
-                await CloseGame(game, Teams.Draw);
+                await CloseDiscordGame(game, Teams.Draw);
             }
         }
 
@@ -809,7 +811,7 @@ namespace BanjoBot
                 return;
             }
 
-            await CloseGame(startedGame, Teams.Draw);
+            await CloseDiscordGame(startedGame, Teams.Draw);
 
             if (!LobbyExists())
             {
@@ -869,6 +871,20 @@ namespace BanjoBot
         
         }
 
+        private async Task UpdateChannelWithLobby() {
+            if (!League.HasDiscord())
+                return;
+
+            SocketTextChannel channel = (SocketTextChannel)League.DiscordInformation.Channel;
+            string topic = "";
+            if (Lobby == null)
+                topic = "Games in progress: " + RunningGames.Count;
+            else
+                topic = "Open Lobby (" + Lobby.WaitingList.Count + "/8)" + "    Games in progress: " + RunningGames.Count;
+
+            await channel.ModifyAsync(channelProperties => channelProperties.Topic = topic);
+        }
+
         private async Task SendPrivateMessage(IGuildUser user, String message) {
             if(League.HasDiscord())
                 await (await user.CreateDMChannelAsync()).SendMessageAsync(message);
@@ -882,15 +898,12 @@ namespace BanjoBot
             return null;
         }
 
-        /// <summary>
-        /// Used to send temporary messages. Sends a message to the Channel then deletes the message after a delay.
-        /// </summary>
-        /// <param name="textChannel">Channel to send the message to</param>
-        /// <param name="message">Message to be sent to the channel</param>
-        /// <returns></returns>
         private async Task SendTempMessage(IMessageChannel textChannel, String message)
         {
             // Send message
+            if (!League.HasDiscord())
+                return;
+
             IUserMessage discordMessage = await textChannel.SendMessageAsync(message);
             
             // Delete message

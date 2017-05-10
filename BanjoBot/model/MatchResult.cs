@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace BanjoBot {
     public class MatchResult {
@@ -32,8 +33,17 @@ namespace BanjoBot {
         }
 
         // Json Constructor
-        public MatchResult() {
-
+        [JsonConstructor]
+        public MatchResult(int matchID, int leagueID, ulong steamMatchID, int season, Teams winner, int duration, List<PlayerMatchStats> stats) {
+            MatchID = matchID;
+            LeagueID = leagueID;
+            SteamMatchID = steamMatchID;
+            Season = season;
+            Winner = winner;
+            Date = DateTime.Now;
+            Duration = duration;
+            PlayerMatchStats = stats;
+            StatsRecorded = true;
         }
 
         // Vote Constructor
@@ -49,21 +59,17 @@ namespace BanjoBot {
             StatsRecorded = false;
             PlayerMatchStats = new List<PlayerMatchStats>();
 
-            //TODO: Move to leaguecontroller?
             PlayerMatchStats stats = null;
             foreach (var player in game.WaitingList) {
                 if ((game.BlueList.Contains(player) && game.Winner == Teams.Blue) ||
                     (game.RedList.Contains(player) && game.Winner == Teams.Red))
                 {
-                    stats = new PlayerMatchStats(this, player.SteamID, game.MmrAdjustment, (2*player.GetLeagueStat(LeagueID, Season).Streak), Winner, true);
+                    stats = new PlayerMatchStats(this, player.SteamID, 0, 0, Winner, false);
                 }
                 else
                 {
-                    stats = new PlayerMatchStats(this, player.SteamID, -game.MmrAdjustment, 0, Winner, false);
+                    stats = new PlayerMatchStats(this, player.SteamID, 0, 0, Winner, false);
                 }
-                PlayerMatchStats.Add(stats);
-                player.Matches.Add(stats);
-
             }
         }
     }

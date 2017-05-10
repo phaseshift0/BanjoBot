@@ -8,7 +8,7 @@ namespace BanjoBot {
     public class PlayerMatchStats {
         public MatchResult Match { get; set; }
         public ulong SteamID { get; set; }
-        public int Hero { get; set; }
+        public int HeroID { get; set; }
         public int Goals { get; set; }
         public int Assist { get; set; }
         public int Steals { get; set; }
@@ -29,7 +29,7 @@ namespace BanjoBot {
         public PlayerMatchStats(MatchResult match, ulong steamId, int hero, int goals, int assist, int steals, int turnovers, int stealTurnDif, int pickups, int passes, int passesReceived, float saveRate, int points, int possessionTime, int timeAsGoalie, int mmrAdjustment, int streakBonus, Teams team, bool win) {
             Match = match;
             SteamID = steamId;
-            Hero = hero;
+            HeroID = hero;
             Goals = goals;
             Assist = assist;
             Steals = steals;
@@ -48,15 +48,18 @@ namespace BanjoBot {
             Win = win;
         }
 
+        //For Json
         public PlayerMatchStats() {
-
+            //TODO missing json constructor attributes
+            //Missing mmrAdjustment
+            //Missing StreakBonus
         }
 
         //For Voting
         public PlayerMatchStats(MatchResult match, ulong steamId, int mmrAdjustment, int streakBonus, Teams team, bool win) {
             Match = match;
             SteamID = steamId;
-            Hero = -1;
+            HeroID = -1;
             Goals = 0;
             Assist = 0;
             Steals = 0;

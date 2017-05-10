@@ -198,7 +198,7 @@ namespace BanjoBot
                         Player newPlayer = new Player(steamIDs[i]);
                         _db.RegisterPlayerToLeague(newPlayer, _leagueCoordinator.GetPublicLeague().League);
                         _leagueCoordinator.GetPublicLeague().League.RegisteredPlayers.Add(newPlayer);
-                        players.Add(result);
+                        players.Add(newPlayer);
                     }
                 }
 
@@ -265,6 +265,11 @@ namespace BanjoBot
                 MatchResult match = JsonConvert.DeserializeObject<MatchResult>(json["MatchResult"].ToString());
                 LeagueController lc = null;
 
+                if (match.PlayerMatchStats.Count != 8)
+                {
+                    return "";
+                }
+                
                 lc = _leagueCoordinator.GetLeagueController(match.LeagueID);
                 if (lc != null)
                 {

@@ -145,11 +145,11 @@ namespace BanjoBot
                             p.Matches.Add(stats);
                     }
 
-                    if (lobby != null)
-                    {
-                        // Restore Lobby
-                        lobby.MmrAdjustment = lobby.CalculateMmrAdjustment();
-                    }
+                    //if (lobby != null)
+                    //{
+                    //    // Restore Lobby
+                    //    lobby.MmrAdjustment = lobby.CalculateMmrAdjustment();
+                    //}
                 }
             }
             Console.WriteLine("done!");

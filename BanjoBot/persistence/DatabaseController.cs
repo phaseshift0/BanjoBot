@@ -184,17 +184,17 @@ namespace BanjoBot
             return matchID;
         }
 
-        public async Task DrawMatch(Lobby game)
+        public async Task DrawMatch(int matchID)
         {
             MySqlCommand command = new MySqlCommand();
             command.CommandText = "update matches set winner=@winner where match_id=@match_id";
             command.Parameters.AddWithValue("@winner", Teams.Draw);
-            command.Parameters.AddWithValue("@match_id", game.MatchID);
+            command.Parameters.AddWithValue("@match_id", matchID);
             await ExecuteNoQuery(command);
 
             command = new MySqlCommand();
             command.CommandText = "Delete from match_player_stats where match_id=@match_id";
-            command.Parameters.AddWithValue("@match_id", game.MatchID);
+            command.Parameters.AddWithValue("@match_id", matchID);
             await ExecuteNoQuery(command);
         }
 

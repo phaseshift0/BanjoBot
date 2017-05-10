@@ -31,7 +31,6 @@ namespace BanjoBot
         public List<Player> RedWinCalls   { get; set; }  
         public List<Player> BlueWinCalls  { get; set; }
         public List<Player> DrawCalls     { get; set; }
-        public int MmrAdjustment { get; set; }
         public bool HasStarted { get; set; }
         public int MatchID { get; set; }
         public int GameNumber { get; set; }
@@ -131,29 +130,6 @@ namespace BanjoBot
             AssignTeams();
             HasStarted = true;
         }
-
-        public int CalculateMmrAdjustment()
-        {
-            double mmrDifference = 0;
-            if (Winner == Teams.Blue)
-            {
-                mmrDifference = GetTeamMMR(Teams.Blue) - GetTeamMMR(Teams.Red);
-            } else
-            {
-                mmrDifference = GetTeamMMR(Teams.Red) - GetTeamMMR(Teams.Blue);
-            }
-          
-            return mmrCurve(mmrDifference);
-        }
-
-        public int mmrCurve(double x) {
-            double baseMMR = 25;
-            double approaches = 10;
-            double approachRate = Math.Atan(-x * (1 / 350.0));
-            double result = approachRate * approaches + baseMMR;
-            return Convert.ToInt32(result);
-        }
-
 
         /// <summary>
         /// Assigns players in waiting list to teams of roughly equal MMR.
