@@ -12,8 +12,7 @@ namespace BanjoBot
 {
     public class DatabaseController
     {
-        //TODO: throw exception catch, somehow send message and redo or not execute command :D
-        private string _connectionString = "server=127.0.0.1;uid=banjo_admin;pwd=D2bblXX!;database=banjoball;";
+        private string _connectionString = "server=127.0.0.1;uid=banjotest;pwd=as9=ce_2c;database=banjoballtest;";
 
         public async Task<int> ExecuteNoQuery(MySqlCommand command)
         {

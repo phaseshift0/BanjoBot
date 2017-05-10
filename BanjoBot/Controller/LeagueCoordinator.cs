@@ -11,7 +11,7 @@ using Discord.WebSocket;
 namespace BanjoBot {
     public class LeagueCoordinator
     {
-        private static readonly int PUBLIC_LEAGUE_ID = 1;
+        private static readonly int PUBLIC_LEAGUE_ID = 25;
         private static readonly LeagueCoordinator instance = new LeagueCoordinator();
         public List<LeagueController> LeagueControllers { get; set; }
         
