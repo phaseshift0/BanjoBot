@@ -56,7 +56,7 @@ namespace BanjoBot
             await LoadLeagueInformation();
             await LoadPlayerBase();
             await LoadMatchHistory();
-            //_socketServer = new SocketServer(_leagueCoordinator);
+            _socketServer = new SocketServer(_leagueCoordinator, _databaseController);
 
             await _bot.LoginAsync(TokenType.Bot, TOKEN);
             await _bot.ConnectAsync();
