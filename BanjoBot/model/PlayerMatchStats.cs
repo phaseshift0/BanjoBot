@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 
 namespace BanjoBot {
     public class PlayerMatchStats {
@@ -49,8 +50,7 @@ namespace BanjoBot {
         }
 
         //For Json
-        public PlayerMatchStats() {
-
+        public PlayerMatchStats() { 
         }
 
         //For Voting

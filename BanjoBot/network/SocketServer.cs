@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Nito.AsyncEx;
 using RestSharp;
 
 namespace BanjoBot
@@ -17,7 +18,7 @@ namespace BanjoBot
         private const int SERVER_PORT = 3637;
         private static List<Socket> _clientSockets = new List<Socket>();
         private static Socket _serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        private static byte[] _buffer = new byte[1024];
+        private static byte[] _buffer = new byte[4096];
         private LeagueCoordinator _leagueCoordinator;
         private DatabaseController _db;
 
@@ -196,7 +197,7 @@ namespace BanjoBot
                     {
                         //Create new player
                         Player newPlayer = new Player(steamIDs[i]);
-                        _leagueCoordinator.GetPublicLeague().RegisterPlayer(newPlayer); //TODO: wait for task complete
+                        AsyncContext.Run(() => _leagueCoordinator.GetPublicLeague().RegisterPlayer(newPlayer)); 
                         players.Add(newPlayer);
                     }
                 }
@@ -211,7 +212,7 @@ namespace BanjoBot
                     foreach (var player in players) {
                         if (!pubLeague.RegisteredPlayers.Contains(player))
                         {
-                            lc.RegisterPlayer(player); //TODO: wait for task complete
+                            AsyncContext.Run(() => lc.RegisterPlayer(player));
                         }
                     }
 
@@ -224,7 +225,7 @@ namespace BanjoBot
                         {
                             SteamID = player.SteamID,
                             Team = Teams.None,
-                            MatchesCount = player.GetLeagueStat(23,1).MatchCount,
+                            MatchesCount = player.GetLeagueStat(pubLeague.LeagueID,pubLeague.Season).MatchCount,
                             Wins = player.GetLeagueStat(pubLeague.LeagueID, pubLeague.Season).Wins,
                             Losses = player.GetLeagueStat(pubLeague.LeagueID, pubLeague.Season).Losses,
                             MMR = player.GetLeagueStat(pubLeague.LeagueID, pubLeague.Season).MMR,
@@ -273,10 +274,10 @@ namespace BanjoBot
 
                 if (match.PlayerMatchStats.Count != 8)
                 {
-                    return "";
+                    //TODO: return "";
                 }
-                
-                lc = _leagueCoordinator.GetLeagueController(match.LeagueID);
+
+                lc = AsyncContext.Run(() => _leagueCoordinator.GetLeagueController(match.LeagueID));
                 if (lc != null)
                 {
                     Task.Run(async () => {await lc.CloseGameByEvent(match);});

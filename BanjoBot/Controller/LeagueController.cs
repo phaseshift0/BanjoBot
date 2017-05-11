@@ -92,15 +92,7 @@ namespace BanjoBot
 
         private async Task CloseGame(Teams winnerTeam, MatchResult match)
         {
-            //was ist relevant?
-            //matchresult added in league. matchresult added in player. matchplayerstats added in player
-            //adjust playerstats
-            //db_updatematch, updateplayermatch ohne insert für public mmr?
-            //db_updateplayerstats
-            //db_updateleague
-
             //Adding missing details
-            match.StatsRecorded = true;
             match.Date = DateTime.Now;
 
             List<Player> winner = new List<Player>();
@@ -120,7 +112,7 @@ namespace BanjoBot
                 Player player = League.RegisteredPlayers.Find(p => p.SteamID == stats.SteamID);
                 player.CurrentGame = null;
 
-                stats.MmrAdjustment = mmrAdjustment;
+                stats.Match = match;
                 if (stats.Team == winnerTeam)
                 {
                     stats.MmrAdjustment = mmrAdjustment;
@@ -133,6 +125,7 @@ namespace BanjoBot
                     stats.Win = false;
                 }
 
+                //TODO: players should have the match instead of the stats
                 player.Matches.Add(stats);
             }
             
@@ -157,6 +150,7 @@ namespace BanjoBot
 
             await UpdateChannelWithLobby();
             if (game.StartMessage != null) {
+                //TODO: Doesnt work with CloseByEvent
                 await game.StartMessage.UnpinAsync();
             }
 
@@ -186,12 +180,14 @@ namespace BanjoBot
 
 
         public async Task CloseGameByEvent(MatchResult matchResult) {
+            //TODO: check teams here again (does it matter if they get forced into teams?)
             Lobby lobby = null;
             foreach (var game in RunningGames) {
                 if (game.MatchID == matchResult.MatchID) {
                     lobby = game;
                 }
             }
+            matchResult.StatsRecorded = true;
             if (lobby != null)
                 await CloseDiscordGame(lobby, matchResult.Winner, matchResult);
             else
@@ -683,9 +679,6 @@ namespace BanjoBot
 
         public async Task ShowPlayerProfile(Player  player, int season)
         {
-            EmbedBuilder builder = new EmbedBuilder();
-            builder.WithColor(new Color(0, 0, 255));
-            builder.Title = player.User.Username + "'s profile";
             float goals = 0;
             float assist = 0;
             float steals = 0;
@@ -725,31 +718,36 @@ namespace BanjoBot
                 }
             }
             PlayerStats playerStats = player.GetLeagueStat(League.LeagueID, season);
+
+            // prevents null division
+            if (statsRecorded == 0)
+                statsRecorded = 1;
+
             string message = $"**{player.User.Username}'s Profile**\n`";
             message += $"{"League",-24} {League.Name,-12} \n";
             message += $"{"Season",-24} {season,-12} \n";
             message += $"{"Matches",-24} {playerStats.MatchCount,-12} \n";
             message += $"{"Wins",-24} {playerStats.Wins,-12} \n";
             message += $"{"Losses",-24} {playerStats.Losses,-12} \n";
-            message += $"{"Winrate",-24} {playerStats.MatchCount/playerStats.Wins,-12:P} \n";
+            message += $"{"Winrate",-24} {(float)playerStats.Wins/(float)playerStats.MatchCount,-12:P} \n";
             message += $"{"Streak",-24} {playerStats.Streak,-12} \n";
             message += $"{"Rating",-24} {playerStats.MMR,-12} `\n";
             message += "\n";
             message += $"**AverageStats**\n`";
-            message += $"{"Goals",-24} {statsRecorded/goals,-12:N} \n";
-            message += $"{"Assist",-24} {statsRecorded/assist,-12:N} \n";
-            message += $"{"Steals",-24} {statsRecorded/steals,-12:N} \n";
-            message += $"{"Turnovers",-24} {statsRecorded/turnovers,-12:N} \n";
-            message += $"{"S-T",-24} {statsRecorded/st,-12:N} \n";
-            message += $"{"Pickups",-24} {statsRecorded/pickups,-12:N} \n";
-            message += $"{"Passes",-24} {statsRecorded/passes,-12:N} \n";
-            message += $"{"PR",-24} {statsRecorded/pr,-12:N} \n";
-            message += $"{"SaveRate",-24} {statsRecorded/save,-12:P} \n";
-            message += $"{"Points",-24} {statsRecorded/points,-12:N} \n";
-            message += $"{"PosT",-24} {statsRecorded/post,-12:N} \n";
-            message += $"{"TAG",-24} {statsRecorded/tag,-12:N} \n`";
+            message += $"{"Goals",-24} {goals/statsRecorded,-12:N} \n";
+            message += $"{"Assist",-24} {assist/statsRecorded,-12:N} \n";
+            message += $"{"Steals",-24} {steals/statsRecorded,-12:N} \n";
+            message += $"{"Turnovers",-24} {turnovers/statsRecorded,-12:N} \n";
+            message += $"{"S-T",-24} {st/statsRecorded,-12:N} \n";
+            message += $"{"Pickups",-24} {pickups/statsRecorded,-12:N} \n";
+            message += $"{"Passes",-24} {passes/statsRecorded,-12:N} \n";
+            message += $"{"PR",-24} {pr/statsRecorded,-12:N} \n";
+            message += $"{"SaveRate",-24} {save/statsRecorded,-12:P} \n";
+            message += $"{"Points",-24} {points/statsRecorded,-12:N} \n";
+            message += $"{"PosT",-24} {post/statsRecorded,-12:N} \n";
+            message += $"{"TAG",-24} {tag/statsRecorded,-12:N} \n`";
             message += $"\n*Stats for {statsRecorded} of {playerStats.MatchCount} games were recorded*";
-            builder.Description = message;
+
             await SendPrivateMessage(player.User as IGuildUser,message);
         }
 
@@ -763,7 +761,7 @@ namespace BanjoBot
             {
                 PlayerMatchStats stats = orderedStats.ElementAt(i);
                 args = new object[] { DateTime.Parse(stats.Match.Date.ToString()).ToShortDateString(),stats.Match.MatchID,stats.Goals, stats.Assist, stats.Steals, stats.Turnovers, stats.StealTurnDif, stats.Pickups, stats.Passes, stats.PassesReceived, stats.SaveRate, stats.Points,stats.PossessionTime,stats.TimeAsGoalie,stats.MmrAdjustment,stats.StreakBonus,stats.Match.StatsRecorded,stats.HeroID};
-                s += String.Format("{0,-12} {1,-8} {17,-10} {2,-8} {3,-8} {4,-8} {5,-10} {6,-8} {7,-8} {8,-8} {9,-8:P0} {10,-8} {11,-8} {12,-8} {13,-8} {14,-8} {15,-8} {16,-8}\n", args);
+                s += String.Format("{0,-12} {1,-8} {17,-10} {2,-8} {3,-8} {4,-8} {5,-10} {6,-8} {7,-8} {8,-8} {9,-8} {10,-8:P0} {11,-8} {12,-8} {13,-8} {14,-8} {15,-8} {16,-8}\n", args);
             }
             if (!orderedStats.Any())
             {

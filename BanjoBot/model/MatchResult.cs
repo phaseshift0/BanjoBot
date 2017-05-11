@@ -31,20 +31,24 @@ namespace BanjoBot {
             PlayerMatchStats = stats;
             StatsRecorded = statsRecorded;
         }
-
         // Json Constructor
-        [JsonConstructor]
-        public MatchResult(int matchID, int leagueID, ulong steamMatchID, int season, Teams winner, int duration, List<PlayerMatchStats> stats) {
-            MatchID = matchID;
-            LeagueID = leagueID;
-            SteamMatchID = steamMatchID;
-            Season = season;
-            Winner = winner;
-            Date = DateTime.Now;
-            Duration = duration;
-            PlayerMatchStats = stats;
-            StatsRecorded = true;
+        public MatchResult()
+        {
+            
         }
+        // Json Constructor
+        //[JsonConstructor]
+        //public MatchResult(int matchID, int leagueID, ulong steamMatchID, int season, Teams winner, int duration, List<PlayerMatchStats> stats) {
+        //    MatchID = matchID;
+        //    LeagueID = leagueID;
+        //    SteamMatchID = steamMatchID;
+        //    Season = season;
+        //    Winner = winner;
+        //    Date = DateTime.Now;
+        //    Duration = duration;
+        //    PlayerMatchStats = stats;
+        //    StatsRecorded = true;
+        //}
 
         // Vote Constructor
         public MatchResult(Lobby game) {
