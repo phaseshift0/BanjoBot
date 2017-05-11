@@ -60,8 +60,6 @@ namespace BanjoBot {
                         return leagueController;
                 }
             }
-
-            Console.WriteLine("Channel not found?" + channel.Id);
             return null;
         }
 
@@ -117,7 +115,7 @@ namespace BanjoBot {
         {
             if (players.Count != 8)
             {
-                return null;
+                //TODO return null;
             }
 
             Lobby lobby  = players.First().CurrentGame;

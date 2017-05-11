@@ -64,12 +64,13 @@ namespace BanjoBot {
                 if ((game.BlueList.Contains(player) && game.Winner == Teams.Blue) ||
                     (game.RedList.Contains(player) && game.Winner == Teams.Red))
                 {
-                    stats = new PlayerMatchStats(this, player.SteamID, 0, 0, Winner, false);
+                    stats = new PlayerMatchStats(this, player.SteamID, 0, 0, Winner, true);
                 }
                 else
                 {
                     stats = new PlayerMatchStats(this, player.SteamID, 0, 0, Winner, false);
                 }
+                PlayerMatchStats.Add(stats);
             }
         }
     }

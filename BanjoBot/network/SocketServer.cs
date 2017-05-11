@@ -182,7 +182,7 @@ namespace BanjoBot
 
                 if (steamIDs.Length != 8)
                 {
-                    return "";
+                    //TODO return "";
                 }
 
                 for (int i = 0; i < steamIDs.Length; i++)
@@ -194,10 +194,9 @@ namespace BanjoBot
                     }
                     else
                     {
-                        //Create new player for public league
+                        //Create new player
                         Player newPlayer = new Player(steamIDs[i]);
-                        _db.RegisterPlayerToLeague(newPlayer, _leagueCoordinator.GetPublicLeague().League);
-                        _leagueCoordinator.GetPublicLeague().League.RegisteredPlayers.Add(newPlayer);
+                        _leagueCoordinator.GetPublicLeague().RegisterPlayer(newPlayer); //TODO: wait for task complete
                         players.Add(newPlayer);
                     }
                 }
@@ -205,9 +204,16 @@ namespace BanjoBot
                 Lobby lobby = _leagueCoordinator.FindLobby(players);
                 if(lobby == null) {
                     // not a league match
-
                     LeagueController lc = _leagueCoordinator.GetPublicLeague();
                     League pubLeague = lc.League;
+
+                    //Register player to public league
+                    foreach (var player in players) {
+                        if (!pubLeague.RegisteredPlayers.Contains(player))
+                        {
+                            lc.RegisterPlayer(player); //TODO: wait for task complete
+                        }
+                    }
 
                     var response = new {
                         LeagueID = pubLeague.LeagueID,

@@ -212,7 +212,11 @@ namespace BanjoBot {
             }
             
             LeagueController lc = _leagueCoordinator.GetLeagueController(socketGuildChannel);
-            
+            if (lc == null) {
+                await ReplyAsync("This is no league channel.");
+                return;
+            }
+
             Player player = lc.League.GetPlayerByDiscordID(Context.User.Id);
             if (player != null) {
                 await ReplyAsync("You are already registered");
@@ -263,8 +267,6 @@ namespace BanjoBot {
             if (lc.League.DiscordInformation.AutoAccept)
             {
                 await lc.RegisterPlayer(player);
-                await _database.RegisterPlayerToLeague(player, lc.League);
-                await _database.UpdatePlayerStats(player, player.GetLeagueStat(lc.League.LeagueID,lc.League.Season));
                 await ReplyAsync( player.User.Mention + "You are registered now. Use !help to see the command list");
             }
             else
@@ -272,11 +274,8 @@ namespace BanjoBot {
             
                 lc.League.Applicants.Add(player);
                 await _database.InsertSignupToLeague(player.SteamID, lc.League);
-                if (lc.League.DiscordInformation.ModeratorChannel == null)
-                {
-                    await ReplyAsync("You are signed up now. Wait for the approval by a moderator");
-                }
-                else
+                await ReplyAsync("You are signed up now. Wait for the approval by a moderator");
+                if (lc.League.DiscordInformation.ModeratorChannel != null)
                 {
                     IUserMessage message = await((ITextChannel) lc.League.DiscordInformation.ModeratorChannel).SendMessageAsync("New applicant: " + player.User.Mention + "\t" + STEAM_PROFILE_URL + player.SteamID +"\tLeague: " + lc.League.Name);
                     await message.PinAsync();

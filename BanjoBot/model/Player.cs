@@ -51,15 +51,9 @@ namespace BanjoBot
 
         public string PlayerMMRString(int leagueID, int season)
         {
-            //TODO: REMOVE
-            if (User != null)
-            {
-                return User.Username + "(" + GetLeagueStat(leagueID, season).MMR + ")";
-            }
-            else
-            {
-                return discordID + "(" + GetLeagueStat(leagueID, season).MMR + ")";
-            }
+
+            return User.Username + "(" + GetLeagueStat(leagueID, season).MMR + ")";
+
         }
 
         public PlayerStats GetLeagueStat(int leagueID, int season) {

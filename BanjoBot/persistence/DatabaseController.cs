@@ -12,7 +12,7 @@ namespace BanjoBot
 {
     public class DatabaseController
     {
-        private string _connectionString = "server=127.0.0.1;uid=banjotest;pwd=as9=ce_2c;database=banjoballtest;";
+        private string _connectionString = "server=127.0.0.1;uid=banjo_admin;pwd=D2bblXX!;database=banjoballtest;";
 
         public async Task<int> ExecuteNoQuery(MySqlCommand command)
         {
@@ -74,10 +74,6 @@ namespace BanjoBot
                 Console.WriteLine(e.Message);
             }
 
-            //using (SqlDataReader reader = ExecuteReader(...)) {
-            //     ... do your stuff ...
-            //} // reader and connection are closed here.
-
             return null;
         }
 
@@ -96,11 +92,11 @@ namespace BanjoBot
 
             StringBuilder queryBuilder =
                 new StringBuilder(
-                    "REPLACE INTO match_player_stats (steam_id, match_id,goals, assist, steals, turnovers, steal_turnover_difference,pickups,passes, passes_received, save_rate, points, possession_time, time_as_goalie, win, mmr_adjustment, streak_bonus,team) VALUES ");
+                    "REPLACE INTO match_player_stats (steam_id, match_id,hero_id, goals, assist, steals, turnovers, steal_turnover_difference,pickups,passes, passes_received, save_rate, points, possession_time, time_as_goalie, win, mmr_adjustment, streak_bonus,team) VALUES ");
             for (int i = 0; i < game.PlayerMatchStats.Count; i++)
             {
                 queryBuilder.AppendFormat(
-                    "(@steam_id{0},@match_id{0},@goals{0},@assist{0},@steals{0},@turnovers{0},@steal_turnover_difference{0},@pickups{0},@passes{0},@passes_received{0},@save_rate{0},@points{0},@possession_time{0},@time_as_goalie{0},@win{0},@mmr_adjustment{0},@streak_bonus{0},@team{0}),",
+                    "(@steam_id{0},@match_id{0},@hero_id{0},@goals{0},@assist{0},@steals{0},@turnovers{0},@steal_turnover_difference{0},@pickups{0},@passes{0},@passes_received{0},@save_rate{0},@points{0},@possession_time{0},@time_as_goalie{0},@win{0},@mmr_adjustment{0},@streak_bonus{0},@team{0}),",
                     i);
                 if (i == game.PlayerMatchStats.Count - 1)
                 {
@@ -114,6 +110,7 @@ namespace BanjoBot
             {
                 command.Parameters.AddWithValue("@steam_id" + i, game.PlayerMatchStats[i].SteamID);
                 command.Parameters.AddWithValue("@match_id" + i, game.MatchID);
+                command.Parameters.AddWithValue("@hero_id" + i, game.PlayerMatchStats[i].HeroID);
                 command.Parameters.AddWithValue("@goals" + i, game.PlayerMatchStats[i].Goals);
                 command.Parameters.AddWithValue("@assist" + i, game.PlayerMatchStats[i].Assist);
                 command.Parameters.AddWithValue("@steals" + i, game.PlayerMatchStats[i].Steals);
@@ -134,7 +131,6 @@ namespace BanjoBot
             }
 
             await ExecuteNoQuery(command);
-
 
         }
         
@@ -163,17 +159,9 @@ namespace BanjoBot
 
             command = new MySqlCommand(queryBuilder.ToString());
             //assign each parameter its value
-            for (int i = 0; i < blueteam.Count; i++)
-            {
-                Teams team = Teams.Blue;
-                command.Parameters.AddWithValue("@steam_id" + i, blueteam[i].SteamID);
-                command.Parameters.AddWithValue("@match_id" + i, matchID);
-                command.Parameters.AddWithValue("@team" + i, team);
-            }
-
-            for (int i = 0; i < redteam.Count; i++) {
-                Teams team = Teams.Red;
-                command.Parameters.AddWithValue("@steam_id" + i, redteam[i].SteamID);
+            for (int i = 0; i < allPlayers.Count; i++) {
+                Teams team = blueteam.Contains(allPlayers[i]) ? Teams.Blue : Teams.Red;
+                command.Parameters.AddWithValue("@steam_id" + i, allPlayers[i].SteamID);
                 command.Parameters.AddWithValue("@match_id" + i, matchID);
                 command.Parameters.AddWithValue("@team" + i, team);
             }
@@ -565,6 +553,9 @@ namespace BanjoBot
                         }
                         else if (reader.GetName(i).Equals("steam_id")) {
                             steam_id = reader.GetUInt64(i);
+                        }
+                        else if (reader.GetName(i).Equals("hero_id")) {
+                            heroID = reader.GetInt32(i);
                         }
                         else if (reader.GetName(i).Equals("goals")) {
                             goals = reader.GetInt32(i);

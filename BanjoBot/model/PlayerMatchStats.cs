@@ -50,9 +50,7 @@ namespace BanjoBot {
 
         //For Json
         public PlayerMatchStats() {
-            //TODO missing json constructor attributes
-            //Missing mmrAdjustment
-            //Missing StreakBonus
+
         }
 
         //For Voting

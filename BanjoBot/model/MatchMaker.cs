@@ -33,7 +33,18 @@ namespace BanjoBot.model {
             {
                 averageMMR += player.GetLeagueStat(leagueID, season).MMR;
             }
-            averageMMR = averageMMR/team.Count;
+            //TODO: Remove me
+            if (team.Count < 1)
+            {
+                averageMMR = 1000;
+            }
+            else
+            {
+                averageMMR = averageMMR / team.Count;
+            }
+        
+
+           
 
             return averageMMR;
         }

@@ -63,15 +63,27 @@ namespace BanjoBot
 
         public async Task RegisterPlayer(Player player)
         {
-            League.Applicants.Remove(player);
-            player.PlayerStats.Add(new PlayerStats(League.LeagueID, League.Season));
-
-            League.RegisteredPlayers.Add(player);
-
-            if (League.DiscordInformation.LeagueRole != null)
+            if (League.RegisteredPlayers.Contains(player))
             {
-                if (!player.User.RoleIds.Contains(League.DiscordInformation.LeagueRole.Id))
-                {
+                return;
+            }
+
+            if (League.Applicants.Contains(player))
+            {
+                League.Applicants.Remove(player);
+            }
+
+            player.PlayerStats.Add(new PlayerStats(League.LeagueID, League.Season));
+            League.RegisteredPlayers.Add(player);
+            await _database.RegisterPlayerToLeague(player, League);
+            await _database.UpdatePlayerStats(player, player.GetLeagueStat(League.LeagueID, League.Season));
+            await AddDiscordRole(player);
+        }
+
+        public async Task AddDiscordRole(Player player)
+        {
+            if (League.HasDiscord() && League.DiscordInformation.LeagueRole != null) {
+                if (!player.User.RoleIds.Contains(League.DiscordInformation.LeagueRole.Id)) {
                     await player.User.AddRolesAsync(League.DiscordInformation.LeagueRole);
                 }
             }
@@ -153,8 +165,9 @@ namespace BanjoBot
                 return;
             }
 
-            if(match == null)
+            if (match == null)
                 match = new MatchResult(game);
+
             await CloseGame(winnerTeam, match);
 
             List<Player> winner = new List<Player>();
@@ -187,6 +200,10 @@ namespace BanjoBot
 
         public async Task DrawMatch(Lobby game)
         {
+            foreach (var player in game.WaitingList)
+            {
+                player.CurrentGame = null;
+            }
             await _database.DrawMatch(game.MatchID);
             await SendMessage((ITextChannel)League.DiscordInformation.Channel, "Game " + game.GetGameName() + " has ended in a draw. No stats have been recorded.");
         }
@@ -742,10 +759,10 @@ namespace BanjoBot
             String s = String.Format("{0,-12} {1,-8} {17,-10} {2,-8} {3,-8} {4,-8} {5,-10} {6,-8} {7,-8} {8,-8} {9,-8} {10,-8} {11,-8} {12,-8} {13,-8} {14,-8} {15,-8} {16,-8}\n", args);
             List<PlayerMatchStats> allStats = player.GetMatchesBySeason(League.LeagueID, season);
             IOrderedEnumerable<PlayerMatchStats> orderedStats = allStats.OrderByDescending(stats => stats.Match.Date);
-            for(int i = 0; i < 10; i++)
+            for(int i = 0; i < 10 && i < allStats.Count; i++)
             {
                 PlayerMatchStats stats = orderedStats.ElementAt(i);
-                args = new object[] { DateTime.Parse(stats.Match.Date.ToString()).ToShortDateString(),stats.Match.MatchID,stats.Goals, stats.Assist, stats.Steals, stats.Turnovers, stats.StealTurnDif, stats.Pickups, stats.Passes, stats.PassesReceived, stats.SaveRate, stats.Points,stats.PossessionTime,stats.TimeAsGoalie,stats.MmrAdjustment,stats.StreakBonus,stats.Match.StatsRecorded,"Storm"};
+                args = new object[] { DateTime.Parse(stats.Match.Date.ToString()).ToShortDateString(),stats.Match.MatchID,stats.Goals, stats.Assist, stats.Steals, stats.Turnovers, stats.StealTurnDif, stats.Pickups, stats.Passes, stats.PassesReceived, stats.SaveRate, stats.Points,stats.PossessionTime,stats.TimeAsGoalie,stats.MmrAdjustment,stats.StreakBonus,stats.Match.StatsRecorded,stats.HeroID};
                 s += String.Format("{0,-12} {1,-8} {17,-10} {2,-8} {3,-8} {4,-8} {5,-10} {6,-8} {7,-8} {8,-8} {9,-8:P0} {10,-8} {11,-8} {12,-8} {13,-8} {14,-8} {15,-8} {16,-8}\n", args);
             }
             if (!orderedStats.Any())

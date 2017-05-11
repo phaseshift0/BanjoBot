@@ -35,9 +35,14 @@ namespace BanjoBot
             new Program().Run().GetAwaiter().GetResult();
         }
 
-        public async Task Run() 
+        public async Task Run()
         {
-            _bot = new DiscordSocketClient();
+            _bot = new DiscordSocketClient(new DiscordSocketConfig
+                {
+                    LogLevel = LogSeverity.Info
+                });
+
+            _bot.Log += Log;
             _bot.GuildAvailable += ServerConnected;
             _bot.GuildUnavailable += ServerDisconnected;
             _bot.MessageReceived += BotOnMessageReceived;
@@ -62,9 +67,7 @@ namespace BanjoBot
             await _bot.ConnectAsync();
             await Task.Delay(-1);
         }
-
-    
-
+       
         private async Task LoadLeagueInformation()
         {
      
@@ -252,7 +255,16 @@ namespace BanjoBot
             // rather an object stating if the command executed succesfully)
             var result = await _commands.ExecuteAsync(context, argPos, _commandMap);
             if (!result.IsSuccess)
+            {
                 await message.Channel.SendMessageAsync(result.ErrorReason);
+            }
+        }
+
+        private Task Log(LogMessage message) {
+            Console.WriteLine(message.ToString());
+            if(message.Exception != null)
+                Console.WriteLine(message.Exception.Message + "\n" + message.Exception.StackTrace);
+            return Task.CompletedTask;
         }
 
         private static void GlobalUnhandledExceptionHandler(object sender, UnhandledExceptionEventArgs e) {
